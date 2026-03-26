@@ -1,0 +1,4362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>抖约出行</title>
+  <!-- 高德地图安全密钥 - 必须在API加载前设置 -->
+  <script type="text/javascript">
+    window._AMapSecurityConfig = {
+      securityJsCode: 'a5e36c0c5761fa3a98ee0c6296df2b53'
+    };
+  </script>
+  <!-- 高德地图API -->
+  <script src="https://webapi.amap.com/maps?v=1.4.15&key=99db8b43bd729a68749babecfdb5a43e"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', sans-serif; background: #ffffff; max-width: 390px; margin: 0 auto; min-height: 100vh; position: relative; overflow-x: hidden; }
+
+    /* ===== 颜色变量 ===== */
+    :root {
+      --primary: #00b36b;
+      --primary-dark: #009959;
+      --primary-light: #e6f9f2;
+      --orange: #ff6b35;
+      --text-dark: #1a1a1a;
+      --text-gray: #888;
+      --border: #eee;
+      --bg: #ffffff;
+      --white: #fff;
+    }
+
+    /* ===== 页面切换 ===== */
+    .page { display: none; flex-direction: column; min-height: 100vh; background: var(--bg); }
+    .page.active { display: flex; }
+
+    /* ===== 顶部状态栏 ===== */
+    .status-bar { height: 44px; background: var(--primary); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; color: white; font-size: 12px; }
+    .status-bar .time { font-weight: 600; font-size: 15px; }
+    .status-bar .icons { display: flex; gap: 6px; align-items: center; }
+
+    /* ===== 导航栏 ===== */
+    .nav-bar { background: var(--primary); padding: 12px 16px 16px; color: white; }
+    .nav-bar .nav-title { font-size: 18px; font-weight: 600; }
+    .nav-bar .nav-sub { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+    .nav-bar-white { background: white; padding: 12px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+    .nav-bar-white .back-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg); cursor: pointer; }
+    .nav-bar-white .title { font-size: 17px; font-weight: 600; color: var(--text-dark); }
+
+    /* ===== 底部TabBar ===== */
+    .tab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 390px; height: 56px; background: white; border-top: 1px solid var(--border); display: flex; z-index: 100; }
+    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; color: var(--text-gray); font-size: 11px; transition: color 0.2s; }
+    .tab-item.active { color: var(--primary); }
+    .tab-item svg { width: 24px; height: 24px; }
+    .tab-dot { width: 6px; height: 6px; background: var(--orange); border-radius: 50%; position: absolute; top: 6px; right: 22px; }
+
+    /* ===== 首页 ===== */
+    #page-home .scroll-area { flex: 1; overflow-y: auto; padding-bottom: 70px; }
+
+    /* 城市选择横幅 */
+    .city-banner { background: linear-gradient(135deg, #00b36b 0%, #00d084 100%); padding: 0 16px 20px; }
+    .city-row { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
+    .city-name { color: white; font-size: 16px; font-weight: 600; }
+    .city-arrow { color: rgba(255,255,255,0.7); font-size: 12px; }
+
+    /* 出行方式选择 */
+    .trip-types { display: flex; gap: 8px; margin-bottom: 16px; }
+    .trip-type-btn { flex: 1; background: rgba(255,255,255,0.2); border: 1.5px solid transparent; color: white; border-radius: 22px; padding: 8px 0; font-size: 13px; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .trip-type-btn.selected { background: white; color: var(--primary); font-weight: 600; border-color: white; }
+
+    /* 出发/目的地输入框 */
+    .location-card { background: white; border-radius: 16px; margin: 0 16px; padding: 4px 0; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .location-row { display: flex; align-items: center; padding: 14px 16px; gap: 12px; cursor: pointer; }
+    .location-row + .location-row { border-top: 1px solid var(--border); }
+    .loc-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .loc-dot.start { background: var(--primary); }
+    .loc-dot.end { background: var(--orange); }
+    .loc-line { width: 1px; height: 18px; background: var(--border); margin-left: 4px; }
+    .loc-text { flex: 1; font-size: 15px; color: var(--text-dark); }
+    .loc-text.placeholder { color: #bbb; }
+    .loc-right { font-size: 12px; color: var(--text-gray); }
+    .loc-right.locating { color: var(--primary); animation: pulse 1s ease-in-out infinite; }
+    .switch-btn { width: 28px; height: 28px; background: var(--primary-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--primary); }
+    .locating-dot { display: inline-block; width: 8px; height: 8px; background: var(--primary); border-radius: 50%; margin-right: 4px; animation: locating 1s ease-in-out infinite; }
+    @keyframes locating { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+
+    /* 快速叫车按钮 */
+    .call-btn-wrap { padding: 16px; }
+    .call-btn { width: 100%; background: linear-gradient(135deg, #00b36b, #00d084); color: white; font-size: 17px; font-weight: 600; padding: 16px; border-radius: 14px; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(0,179,107,0.4); letter-spacing: 1px; transition: transform 0.1s; }
+    .call-btn:active { transform: scale(0.98); }
+
+    /* 优惠卡片 */
+    .section-title { font-size: 15px; font-weight: 600; color: var(--text-dark); padding: 12px 16px 8px; }
+    .promo-scroll { display: flex; gap: 10px; padding: 0 16px 12px; overflow-x: auto; scrollbar-width: none; }
+    .promo-scroll::-webkit-scrollbar { display: none; }
+    .promo-card { flex-shrink: 0; width: 160px; background: linear-gradient(135deg, #ff6b35, #ff9a5c); border-radius: 12px; padding: 14px; color: white; }
+    .promo-card.blue { background: linear-gradient(135deg, #4a90e2, #7bb8f8); }
+    .promo-card.purple { background: linear-gradient(135deg, #9b59b6, #c39bd3); }
+    .promo-amount { font-size: 28px; font-weight: 700; }
+    .promo-amount span { font-size: 14px; }
+    .promo-desc { font-size: 11px; opacity: 0.9; margin-top: 4px; }
+    .promo-limit { font-size: 10px; opacity: 0.7; margin-top: 8px; }
+
+    /* 服务列表 */
+    .service-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 0 16px 12px; }
+    .service-item { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+    .service-icon { width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .service-label { font-size: 12px; color: var(--text-dark); }
+
+    /* 广告横幅 */
+    .banner-wrap { padding: 0 16px 12px; }
+    .banner-img { width: 100%; height: 90px; background: linear-gradient(135deg, #00b36b, #009959); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: 600; position: relative; overflow: hidden; }
+    .banner-img::before { content: ''; position: absolute; right: -20px; top: -20px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+
+    /* ===== 叫车中页面 ===== */
+    #page-calling .map-area { flex: 1; background: #e8f4e8; position: relative; overflow: hidden; min-height: 300px; }
+    .map-bg { width: 100%; height: 100%; background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect fill="%23e8f4f0"/><line x1="0" y1="100" x2="400" y2="100" stroke="%23d0e8d8" stroke-width="1"/><line x1="0" y1="200" x2="400" y2="200" stroke="%23d0e8d8" stroke-width="1"/><line x1="0" y1="300" x2="400" y2="300" stroke="%23d0e8d8" stroke-width="1"/><line x1="100" y1="0" x2="100" y2="400" stroke="%23d0e8d8" stroke-width="1"/><line x1="200" y1="0" x2="200" y2="400" stroke="%23d0e8d8" stroke-width="1"/><line x1="300" y1="0" x2="300" y2="400" stroke="%23d0e8d8" stroke-width="1"/></svg>'); }
+    .map-road { position: absolute; background: #c8dcc8; }
+    .map-road.h { height: 24px; left: 0; right: 0; }
+    .map-road.v { width: 20px; top: 0; bottom: 0; }
+    .map-road.r1 { top: 40%; }
+    .map-road.r2 { top: 65%; }
+    .map-road.c1 { left: 30%; }
+    .map-road.c2 { left: 65%; }
+    .car-marker { position: absolute; font-size: 28px; transform: translate(-50%, -50%); animation: drive 3s ease-in-out infinite; }
+    @keyframes drive { 0%,100% { transform: translate(-50%,-50%) rotate(-5deg); } 50% { transform: translate(-50%,-50%) rotate(5deg); } }
+    .pin-start { position: absolute; bottom: 30%; left: 35%; transform: translateX(-50%); }
+    .pin-end { position: absolute; top: 20%; right: 25%; }
+    .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .pin-dot.green { background: var(--primary); }
+    .pin-dot.orange { background: var(--orange); }
+    .route-line { position: absolute; border: 2.5px dashed var(--primary); opacity: 0.6; }
+
+    .calling-card { background: white; border-radius: 20px 20px 0 0; padding: 20px 16px; box-shadow: 0 -4px 20px rgba(0,0,0,0.08); }
+    .calling-status { text-align: center; margin-bottom: 16px; }
+    .calling-spinner { width: 48px; height: 48px; border: 4px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .calling-title { font-size: 17px; font-weight: 600; color: var(--text-dark); }
+    .calling-sub { font-size: 13px; color: var(--text-gray); margin-top: 4px; }
+    .driver-info { display: flex; align-items: center; gap: 12px; background: var(--bg); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+    .driver-avatar { width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; flex-shrink: 0; }
+    .driver-detail { flex: 1; }
+    .driver-name { font-size: 15px; font-weight: 600; color: var(--text-dark); }
+    .driver-meta { font-size: 12px; color: var(--text-gray); margin-top: 3px; }
+    .driver-rating { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+    .stars { color: #ffc107; font-size: 12px; }
+    .rating-text { font-size: 12px; color: var(--text-gray); }
+    .driver-plate { background: var(--primary-light); color: var(--primary); font-size: 14px; font-weight: 600; padding: 6px 12px; border-radius: 8px; }
+    .trip-detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .trip-detail-row:last-child { border-bottom: none; }
+    .trip-detail-label { color: var(--text-gray); }
+    .trip-detail-val { color: var(--text-dark); font-weight: 500; }
+    .cancel-btn { width: 100%; padding: 13px; border: 1.5px solid #ddd; border-radius: 12px; background: white; color: var(--text-gray); font-size: 15px; cursor: pointer; margin-top: 12px; }
+
+    /* ===== 确认订单页 ===== */
+    #page-confirm .content { flex: 1; overflow-y: auto; padding-bottom: 80px; }
+    .confirm-map { height: 160px; background: linear-gradient(160deg, #e8f4e8 0%, #d4edda 100%); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .confirm-map .route-visual { display: flex; align-items: center; gap: 0; width: 80%; }
+    .route-point { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .route-point-dot { width: 12px; height: 12px; border-radius: 50%; border: 2.5px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+    .route-point-dot.s { background: var(--primary); }
+    .route-point-dot.e { background: var(--orange); }
+    .route-point-label { font-size: 11px; color: #555; max-width: 80px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .route-line-h { flex: 1; height: 3px; background: repeating-linear-gradient(90deg, var(--primary) 0, var(--primary) 8px, transparent 8px, transparent 14px); }
+    .car-on-route { font-size: 22px; margin: 0 6px; }
+    .confirm-section { background: white; margin: 10px 0 0; }
+    .confirm-section-title { font-size: 13px; color: var(--text-gray); padding: 12px 16px 6px; border-bottom: 1px solid var(--border); }
+    .car-type-list { display: flex; flex-direction: column; }
+    .car-type-item { display: flex; align-items: center; padding: 14px 16px; gap: 12px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+    .car-type-item:last-child { border-bottom: none; }
+    .car-type-item.selected { background: var(--primary-light); }
+    .car-type-icon { font-size: 32px; width: 48px; text-align: center; }
+    .car-type-info { flex: 1; }
+    .car-type-name { font-size: 15px; font-weight: 600; color: var(--text-dark); }
+    .car-type-desc { font-size: 12px; color: var(--text-gray); margin-top: 2px; }
+    .car-type-wait { font-size: 11px; color: var(--primary); background: var(--primary-light); padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block; }
+    .car-type-price { text-align: right; }
+    .car-type-price .price { font-size: 20px; font-weight: 700; color: var(--text-dark); }
+    .car-type-price .price span { font-size: 13px; }
+    .car-type-price .origin-price { font-size: 12px; color: #bbb; text-decoration: line-through; }
+    .car-type-radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; }
+    .car-type-radio.checked { border-color: var(--primary); background: var(--primary); }
+    .car-type-radio.checked::after { content: ''; width: 8px; height: 8px; background: white; border-radius: 50%; }
+    .pay-row { display: flex; align-items: center; padding: 14px 16px; gap: 12px; cursor: pointer; }
+    .pay-icon { font-size: 22px; }
+    .pay-label { flex: 1; font-size: 15px; color: var(--text-dark); }
+    .pay-right { font-size: 13px; color: var(--text-gray); }
+    .coupon-row { display: flex; align-items: center; padding: 14px 16px; gap: 12px; border-top: 1px solid var(--border); cursor: pointer; }
+    .coupon-tag { background: linear-gradient(135deg, #ff6b35, #ff9a5c); color: white; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+    .confirm-footer { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 390px; background: white; padding: 12px 16px 24px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+    .confirm-total { flex: 1; }
+    .confirm-total-price { font-size: 22px; font-weight: 700; color: var(--text-dark); }
+    .confirm-total-price span { font-size: 14px; }
+    .confirm-total-label { font-size: 12px; color: var(--text-gray); margin-top: 2px; }
+    .confirm-order-btn { background: linear-gradient(135deg, #00b36b, #00d084); color: white; font-size: 16px; font-weight: 600; padding: 14px 28px; border-radius: 14px; border: none; cursor: pointer; box-shadow: 0 4px 16px rgba(0,179,107,0.4); }
+
+    /* ===== 我的订单页 ===== */
+    #page-orders .content { flex: 1; overflow-y: auto; padding-bottom: 70px; }
+    .order-tabs { display: flex; background: white; border-bottom: 1px solid var(--border); }
+    .order-tab { flex: 1; padding: 12px 0; text-align: center; font-size: 14px; color: var(--text-gray); cursor: pointer; position: relative; }
+    .order-tab.active { color: var(--primary); font-weight: 600; }
+    .order-tab.active::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 2.5px; background: var(--primary); border-radius: 2px; }
+    .order-card { background: white; margin: 10px 12px 0; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 8px rgba(0,0,0,0.06); }
+    .order-card-header { padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+    .order-type-badge { background: var(--primary-light); color: var(--primary); font-size: 12px; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+    .order-status { font-size: 13px; }
+    .order-status.completed { color: var(--text-gray); }
+    .order-status.ongoing { color: var(--orange); font-weight: 500; }
+    .order-route { padding: 12px 14px; }
+    .order-route-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 14px; }
+    .order-route-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .order-route-dot.s { background: var(--primary); }
+    .order-route-dot.e { background: var(--orange); }
+    .order-route-text { color: var(--text-dark); flex: 1; }
+    .order-route-line-v { width: 1px; height: 14px; background: var(--border); margin-left: 3.5px; }
+    .order-footer { padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; background: var(--bg); }
+    .order-footer-info { font-size: 12px; color: var(--text-gray); }
+    .order-footer-price { font-size: 17px; font-weight: 700; color: var(--text-dark); }
+    .order-actions { display: flex; gap: 8px; }
+    .order-action-btn { padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1.5px solid; }
+    .order-action-btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
+    .order-action-btn.outline { background: white; color: var(--text-gray); border-color: #ddd; }
+    .empty-orders { display: flex; flex-direction: column; align-items: center; padding: 60px 20px; color: var(--text-gray); font-size: 14px; }
+    .empty-orders .empty-icon { font-size: 60px; margin-bottom: 16px; opacity: 0.5; }
+
+    /* ===== 我的页面 ===== */
+    #page-mine .content { flex: 1; overflow-y: auto; padding-bottom: 70px; }
+    .mine-header { background: linear-gradient(135deg, #00b36b, #009959); padding: 24px 16px 60px; }
+    .mine-user-row { display: flex; align-items: center; gap: 14px; }
+    .mine-avatar { width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 30px; border: 2.5px solid rgba(255,255,255,0.6); }
+    .mine-user-info .name { font-size: 18px; font-weight: 600; color: white; }
+    .mine-user-info .phone { font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 4px; }
+    .mine-stats { display: flex; background: white; margin: -36px 16px 0; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); padding: 16px 0; }
+    .mine-stat-item { flex: 1; text-align: center; }
+    .mine-stat-item + .mine-stat-item { border-left: 1px solid var(--border); }
+    .mine-stat-num { font-size: 20px; font-weight: 700; color: var(--text-dark); }
+    .mine-stat-label { font-size: 12px; color: var(--text-gray); margin-top: 4px; }
+    .mine-menu { background: white; margin: 12px 0 0; }
+    .mine-menu-item { display: flex; align-items: center; padding: 16px; gap: 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+    .mine-menu-item:last-child { border-bottom: none; }
+    .mine-menu-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .mine-menu-label { flex: 1; font-size: 15px; color: var(--text-dark); }
+    .mine-menu-right { font-size: 13px; color: var(--text-gray); display: flex; align-items: center; gap: 4px; }
+    .mine-menu-badge { background: var(--orange); color: white; font-size: 11px; padding: 1px 6px; border-radius: 8px; }
+    .wallet-card { background: linear-gradient(135deg, #667eea, #764ba2); margin: 12px 16px 0; border-radius: 14px; padding: 18px; color: white; }
+    .wallet-title { font-size: 13px; opacity: 0.8; }
+    .wallet-balance { font-size: 32px; font-weight: 700; margin: 6px 0; }
+    .wallet-actions { display: flex; gap: 10px; margin-top: 12px; }
+    .wallet-btn { flex: 1; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); border-radius: 8px; padding: 8px; text-align: center; font-size: 14px; cursor: pointer; }
+
+    /* ===== 通知提示 ===== */
+    .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8); background: rgba(0,0,0,0.75); color: white; padding: 12px 22px; border-radius: 10px; font-size: 14px; opacity: 0; transition: all 0.25s; z-index: 9999; pointer-events: none; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    /* ===== 弹窗 ===== */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: none; align-items: flex-end; }
+    .modal-overlay.show { display: flex; }
+    .modal-sheet { background: white; border-radius: 20px 20px 0 0; padding: 20px 16px 34px; width: 100%; }
+    .modal-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 0 auto 16px; }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 16px; }
+    .city-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .city-chip { padding: 10px; border: 1.5px solid var(--border); border-radius: 10px; text-align: center; font-size: 14px; cursor: pointer; }
+    .city-chip.active { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+
+    /* ===== 评价弹窗 ===== */
+    .rate-stars { display: flex; gap: 8px; justify-content: center; margin: 16px 0; }
+    .rate-star { font-size: 32px; cursor: pointer; transition: transform 0.1s; }
+    .rate-star:active { transform: scale(1.2); }
+    .rate-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .rate-tag { padding: 6px 14px; border: 1.5px solid var(--border); border-radius: 18px; font-size: 13px; cursor: pointer; color: var(--text-gray); }
+    .rate-tag.selected { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .rate-submit { width: 100%; background: var(--primary); color: white; padding: 14px; border-radius: 12px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; }
+
+    /* ===== 地址输入页 ===== */
+    #page-address .content { flex: 1; overflow-y: auto; padding-bottom: 20px; }
+    .search-input-wrap { padding: 12px 16px; background: white; }
+    .search-input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 15px; outline: none; }
+    .search-input:focus { border-color: var(--primary); }
+    .address-section { margin-top: 6px; }
+    .address-section-label { font-size: 12px; color: var(--text-gray); padding: 10px 16px 6px; }
+    .address-item { display: flex; align-items: center; padding: 14px 16px; background: white; border-bottom: 1px solid var(--border); gap: 12px; cursor: pointer; }
+    .address-item-icon { font-size: 20px; width: 32px; text-align: center; }
+    .address-item-info { flex: 1; }
+    .address-item-name { font-size: 15px; color: var(--text-dark); }
+    .address-item-sub { font-size: 12px; color: var(--text-gray); margin-top: 2px; }
+    .address-item-dist { font-size: 12px; color: var(--text-gray); }
+
+    /* ===== 动画 ===== */
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .slide-up { animation: slideUp 0.35s ease; }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+
+    /* ===== 行程进行中 ===== */
+    .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin: 12px 0; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #00d084); border-radius: 2px; transition: width 0.5s ease; }
+    .trip-steps { display: flex; justify-content: space-between; margin-bottom: 16px; }
+    .trip-step { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--text-gray); }
+    .trip-step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+    .trip-step.done .trip-step-dot { background: var(--primary); }
+    .trip-step.current .trip-step-dot { background: var(--primary); box-shadow: 0 0 0 4px rgba(0,179,107,0.2); }
+    .trip-step.done, .trip-step.current { color: var(--primary); font-weight: 500; }
+
+    /* ===== 拖动地图选点页面 ===== */
+    #page-pick-map { position: relative; }
+    #page-pick-map .pick-map-container { position: absolute; inset: 0; }
+    #pick-amap { width: 100%; height: 100%; }
+
+    /* 顶部导航覆盖层 */
+    .pick-map-header {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 200;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%);
+      padding: 14px 16px 32px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .pick-map-back {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,0.92); display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); flex-shrink: 0;
+      font-size: 18px;
+    }
+    .pick-map-title { color: white; font-size: 17px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+
+    /* 中心固定Pin */
+    .pick-map-pin {
+      position: absolute; top: 50%; left: 50%; z-index: 200;
+      transform: translate(-50%, calc(-100% - 4px));
+      pointer-events: none;
+      transition: transform 0.15s;
+    }
+    .pick-map-pin.dragging { transform: translate(-50%, calc(-100% - 12px)); }
+    .pick-map-pin-icon {
+      width: 38px; height: 48px; display: block; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+    }
+    .pick-map-pin-shadow {
+      width: 16px; height: 6px; background: rgba(0,0,0,0.18); border-radius: 50%;
+      margin: 0 auto; transition: all 0.15s;
+    }
+    .pick-map-pin.dragging .pick-map-pin-shadow { width: 10px; opacity: 0.5; }
+
+    /* 底部信息面板 */
+    .pick-map-bottom {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 200;
+      background: white; border-radius: 20px 20px 0 0;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.13);
+      padding: 16px 16px 28px;
+    }
+    .pick-map-bottom-handle { width: 40px; height: 4px; background: #e0e0e0; border-radius: 2px; margin: 0 auto 16px; }
+    .pick-map-addr-label { font-size: 12px; color: var(--text-gray); margin-bottom: 6px; }
+    .pick-map-addr-text { font-size: 15px; font-weight: 600; color: var(--text-dark); min-height: 22px; margin-bottom: 16px; line-height: 1.4; }
+    .pick-map-addr-sub { font-size: 12px; color: var(--text-gray); margin-top: 4px; font-weight: 400; }
+    .pick-map-confirm-btn {
+      width: 100%; background: linear-gradient(135deg, #00b36b, #00d084);
+      color: white; font-size: 16px; font-weight: 600;
+      padding: 14px; border-radius: 14px; border: none; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,179,107,0.35);
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .pick-map-confirm-btn:active { opacity: 0.85; }
+    /* 搜索框快捷入口 */
+    .pick-map-search-bar {
+      display: flex; align-items: center; gap: 10px;
+      background: #f8f8f8; border-radius: 12px; padding: 10px 14px;
+      margin-bottom: 14px; cursor: pointer;
+    }
+    .pick-map-search-bar span { font-size: 14px; color: #999; }
+
+    /* ===== 微信登录弹窗 ===== */
+    .login-modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+      z-index: 2000; display: flex; align-items: flex-end; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .login-modal-overlay.show { opacity: 1; pointer-events: all; }
+    .login-modal {
+      background: white; border-radius: 24px 24px 0 0; width: 100%; max-width: 390px;
+      padding: 0 0 36px; transform: translateY(100%); transition: transform 0.35s cubic-bezier(.4,0,.2,1);
+    }
+    .login-modal-overlay.show .login-modal { transform: translateY(0); }
+    .login-modal-handle { width: 40px; height: 4px; background: #e0e0e0; border-radius: 2px; margin: 14px auto 0; }
+    .login-modal-close { position: absolute; top: 14px; right: 20px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; color: #aaa; }
+    .login-modal-body { padding: 16px 28px 0; position: relative; }
+    .login-logo { width: 72px; height: 72px; background: linear-gradient(135deg,#00b36b,#00d084); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 14px; box-shadow: 0 4px 16px rgba(0,179,107,0.3); }
+    .login-title { text-align: center; font-size: 20px; font-weight: 700; color: var(--text-dark); margin-bottom: 6px; }
+    .login-sub { text-align: center; font-size: 13px; color: var(--text-gray); margin-bottom: 28px; }
+    .login-wechat-btn {
+      width: 100%; background: #07c160; color: white;
+      font-size: 16px; font-weight: 600; padding: 15px;
+      border-radius: 14px; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-bottom: 14px; box-shadow: 0 4px 16px rgba(7,193,96,0.3);
+    }
+    .login-wechat-btn:active { background: #06ad56; }
+    .login-wechat-btn svg { width: 22px; height: 22px; fill: white; }
+    .login-phone-btn {
+      width: 100%; background: white; color: var(--text-dark);
+      font-size: 15px; font-weight: 500; padding: 14px;
+      border-radius: 14px; border: 1.5px solid var(--border); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-bottom: 20px;
+    }
+    .login-phone-btn:active { background: #f5f5f5; }
+    .login-agreement { text-align: center; font-size: 11px; color: #aaa; line-height: 1.6; }
+    .login-agreement a { color: var(--primary); text-decoration: none; }
+    /* 登录状态：已登录的"我的"头部 */
+    .mine-login-btn {
+      background: rgba(255,255,255,0.2); border: 1.5px solid rgba(255,255,255,0.6);
+      color: white; font-size: 14px; font-weight: 600; padding: 8px 20px;
+      border-radius: 22px; cursor: pointer; margin-top: 10px;
+    }
+    /* 手机号登录输入 */
+    .phone-login-wrap { display: none; }
+    .phone-login-wrap.active { display: block; }
+    .phone-input-group { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+    .phone-input { flex: 1; background: white; border: 1.5px solid var(--border); border-radius: 12px; padding: 13px 16px; font-size: 15px; outline: none; }
+    .sms-btn { flex-shrink: 0; background: var(--primary-light); color: var(--primary); font-size: 13px; font-weight: 600; padding: 13px 14px; border-radius: 12px; border: none; cursor: pointer; white-space: nowrap; }
+    .sms-btn:disabled { color: #aaa; background: #f0f0f0; }
+    .phone-login-submit { width: 100%; background: var(--primary); color: white; font-size: 15px; font-weight: 600; padding: 14px; border-radius: 14px; border: none; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<!-- ===== 首页 ===== -->
+<div id="page-home" class="page active">
+  <div class="status-bar">
+    <span class="time">22:00</span>
+    <span>抖约出行</span>
+    <div class="icons">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M1.5 8.5C5.5 4.5 10.5 2 12 2s6.5 2.5 10.5 6.5M4.5 11.5C7.5 8.5 10 7 12 7s4.5 1.5 7.5 4.5M7.5 14.5C9 13 10.5 12 12 12s3 1 4.5 2.5M12 17h.01" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M17 7H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2zM8 7V5a4 4 0 018 0v2" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <div class="scroll-area">
+    <!-- 顶部绿色区域 -->
+    <div class="city-banner">
+      <div class="nav-bar">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div class="nav-title">🚗 抖约出行</div>
+            <div class="nav-sub">安全 · 快捷 · 舒适</div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <div style="background:rgba(255,255,255,0.2);padding:6px 12px;border-radius:18px;font-size:13px;color:white;cursor:pointer;" onclick="showToast('消息中心')">
+              📬 消息
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 城市选择 -->
+      <div class="city-row" onclick="showCityModal()">
+        <span style="color:rgba(255,255,255,0.7);font-size:13px;">📍</span>
+        <span class="city-name" id="city-name">贵阳市</span>
+        <span class="city-arrow">▼</span>
+        <span style="flex:1"></span>
+        <span style="color:rgba(255,255,255,0.7);font-size:12px;">全国</span>
+      </div>
+
+      <!-- 出行方式 -->
+      <div class="trip-types">
+        <div class="trip-type-btn selected" onclick="selectTripType(this,'快车')">🚗 快车</div>
+        <div class="trip-type-btn" onclick="selectTripType(this,'顺风车')">🚐 顺风车</div>
+        <div class="trip-type-btn" onclick="selectTripType(this,'代驾')">🔑 代驾</div>
+        <div class="trip-type-btn" onclick="selectTripType(this,'包车')">🏎 包车</div>
+      </div>
+    </div>
+
+    <!-- 出发/目的地卡片 -->
+    <div class="location-card slide-up">
+      <div class="location-row" onclick="openAddressPage('start')">
+        <div class="loc-dot start"></div>
+        <div class="loc-text placeholder" id="loc-start">您在哪里上车？</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:1px;height:18px;background:var(--border);"></div>
+          <div style="font-size:11px;color:var(--primary);cursor:pointer;white-space:nowrap;" onclick="event.stopPropagation();openPickMap('start')">🗺 地图</div>
+          <div style="width:1px;height:18px;background:var(--border);"></div>
+          <div class="loc-right" id="loc-btn" onclick="event.stopPropagation();autoLocate()">📍 定位</div>
+        </div>
+      </div>
+      <div style="padding:0 16px;"><div style="height:1px;background:var(--border);margin-left:22px;"></div></div>
+      <div class="location-row" onclick="openAddressPage('end')">
+        <div class="loc-dot end"></div>
+        <div class="loc-text placeholder" id="loc-end">你要去哪里？</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:11px;color:var(--orange);cursor:pointer;white-space:nowrap;" onclick="event.stopPropagation();openPickMap('end')">🗺 地图</div>
+          <div class="switch-btn" onclick="event.stopPropagation();switchStartEnd()">⇅</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 叫车按钮 -->
+    <div class="call-btn-wrap">
+      <button class="call-btn" onclick="goToConfirm()">立即叫车</button>
+    </div>
+
+    <!-- 快捷服务 -->
+    <div class="section-title">常用服务</div>
+    <div class="service-grid">
+      <div class="service-item" onclick="showToast('机场接送')">
+        <div class="service-icon" style="background:#fff3e0;">✈️</div>
+        <div class="service-label">机场接送</div>
+      </div>
+      <div class="service-item" onclick="showToast('高铁接送')">
+        <div class="service-icon" style="background:#e8f5e9;">🚄</div>
+        <div class="service-label">高铁接送</div>
+      </div>
+      <div class="service-item" onclick="showToast('企业用车')">
+        <div class="service-icon" style="background:#e3f2fd;">💼</div>
+        <div class="service-label">企业用车</div>
+      </div>
+      <div class="service-item" onclick="showToast('旅游包车')">
+        <div class="service-icon" style="background:#fce4ec;">🏔</div>
+        <div class="service-label">旅游包车</div>
+      </div>
+    </div>
+
+    <!-- 优惠券 -->
+    <div class="section-title">专属优惠</div>
+    <div class="promo-scroll">
+      <div class="promo-card">
+        <div class="promo-amount"><span>¥</span>15</div>
+        <div class="promo-desc">新用户首单立减</div>
+        <div class="promo-limit">满30元可用 · 剩3天</div>
+      </div>
+      <div class="promo-card blue">
+        <div class="promo-amount"><span>¥</span>8</div>
+        <div class="promo-desc">周末出行优惠</div>
+        <div class="promo-limit">满20元可用 · 剩7天</div>
+      </div>
+      <div class="promo-card purple">
+        <div class="promo-amount">9折</div>
+        <div class="promo-desc">会员专属折扣</div>
+        <div class="promo-limit">无门槛使用 · 剩15天</div>
+      </div>
+    </div>
+
+    <!-- 广告 -->
+    <div class="section-title">活动推荐</div>
+    <div class="banner-wrap">
+      <div class="banner-img" onclick="showToast('活动详情')">
+        🎉 邀请好友得现金红包
+        <span style="position:absolute;right:16px;font-size:13px;opacity:0.8;">去邀请 ›</span>
+      </div>
+    </div>
+
+    <div style="height:20px;"></div>
+  </div>
+</div>
+
+<!-- ===== 地址选择页 ===== -->
+<div id="page-address" class="page">
+  <div class="status-bar" style="background:#fff;">
+    <span class="time" style="color:var(--text-dark);">22:00</span>
+    <span style="color:var(--text-dark);">选择地点</span>
+    <div class="icons">
+      <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#888"/></svg>
+    </div>
+  </div>
+  <div class="nav-bar-white">
+    <div class="back-btn" onclick="goBack()">‹</div>
+    <div class="title" id="addr-page-title">选择上车地点</div>
+  </div>
+  <div class="search-input-wrap">
+    <input class="search-input" id="address-search-input" placeholder="搜索地址或地点" oninput="filterAddress(this.value)" />
+  </div>
+  <div class="content">
+    <div class="address-section">
+      <div class="address-section-label">常用地址</div>
+      <div class="address-item" onclick="selectAddress('贵州省贵阳市南明区')">
+        <div class="address-item-icon">🏠</div>
+        <div class="address-item-info">
+          <div class="address-item-name">家</div>
+          <div class="address-item-sub">贵州省贵阳市南明区花溪大道</div>
+        </div>
+        <div class="address-item-dist">0.3km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('贵阳国际金融中心')">
+        <div class="address-item-icon">🏢</div>
+        <div class="address-item-info">
+          <div class="address-item-name">公司</div>
+          <div class="address-item-sub">贵阳国际金融中心 CBD</div>
+        </div>
+        <div class="address-item-dist">2.1km</div>
+      </div>
+    </div>
+    <div class="address-section" id="address-list">
+      <div class="address-section-label">附近地点</div>
+      <div class="address-item" onclick="selectAddress('贵阳北站')">
+        <div class="address-item-icon">🚄</div>
+        <div class="address-item-info">
+          <div class="address-item-name">贵阳北站</div>
+          <div class="address-item-sub">云岩区北京路与枣山路交叉口</div>
+        </div>
+        <div class="address-item-dist">3.2km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('贵阳龙洞堡国际机场')">
+        <div class="address-item-icon">✈️</div>
+        <div class="address-item-info">
+          <div class="address-item-name">贵阳龙洞堡国际机场</div>
+          <div class="address-item-sub">南明区龙洞堡机场路</div>
+        </div>
+        <div class="address-item-dist">8.5km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('贵州省人民医院')">
+        <div class="address-item-icon">🏥</div>
+        <div class="address-item-info">
+          <div class="address-item-name">贵州省人民医院</div>
+          <div class="address-item-sub">中华北路83号</div>
+        </div>
+        <div class="address-item-dist">1.8km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('花溪公园')">
+        <div class="address-item-icon">🌿</div>
+        <div class="address-item-info">
+          <div class="address-item-name">花溪公园</div>
+          <div class="address-item-sub">花溪区花溪公园路</div>
+        </div>
+        <div class="address-item-dist">4.6km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('观山湖万达广场')">
+        <div class="address-item-icon">🛍</div>
+        <div class="address-item-info">
+          <div class="address-item-name">观山湖万达广场</div>
+          <div class="address-item-sub">观山湖区长岭北路</div>
+        </div>
+        <div class="address-item-dist">5.9km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('贵州大学')">
+        <div class="address-item-icon">🎓</div>
+        <div class="address-item-info">
+          <div class="address-item-name">贵州大学</div>
+          <div class="address-item-sub">花溪区贵州大学南路</div>
+        </div>
+        <div class="address-item-dist">6.1km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('甲秀楼')">
+        <div class="address-item-icon">🏛️</div>
+        <div class="address-item-info">
+          <div class="address-item-name">甲秀楼</div>
+          <div class="address-item-sub">南明区翠微巷8号</div>
+        </div>
+        <div class="address-item-dist">2.3km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('黔灵山公园')">
+        <div class="address-item-icon">⛰️</div>
+        <div class="address-item-info">
+          <div class="address-item-name">黔灵山公园</div>
+          <div class="address-item-sub">云岩区枣山路187号</div>
+        </div>
+        <div class="address-item-dist">2.8km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('贵阳火车站')">
+        <div class="address-item-icon">🚂</div>
+        <div class="address-item-info">
+          <div class="address-item-name">贵阳火车站</div>
+          <div class="address-item-sub">南明区遵义路</div>
+        </div>
+        <div class="address-item-dist">1.5km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('大十字')">
+        <div class="address-item-icon">🏢</div>
+        <div class="address-item-info">
+          <div class="address-item-name">大十字</div>
+          <div class="address-item-sub">南明区中华南路</div>
+        </div>
+        <div class="address-item-dist">0.8km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('喷水池')">
+        <div class="address-item-icon">⛲</div>
+        <div class="address-item-info">
+          <div class="address-item-name">喷水池</div>
+          <div class="address-item-sub">云岩区中华中路</div>
+        </div>
+        <div class="address-item-dist">1.2km</div>
+      </div>
+      <div class="address-item" onclick="selectAddress('花果园')">
+        <div class="address-item-icon">🏘️</div>
+        <div class="address-item-info">
+          <div class="address-item-name">花果园</div>
+          <div class="address-item-sub">南明区花果园大街</div>
+        </div>
+        <div class="address-item-dist">3.5km</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 确认订单页 ===== -->
+<div id="page-confirm" class="page">
+  <div class="status-bar">
+    <span class="time">22:00</span>
+    <span>确认用车</span>
+    <div class="icons"></div>
+  </div>
+  <div class="nav-bar-white">
+    <div class="back-btn" onclick="goBack()">‹</div>
+    <div class="title">选择车型</div>
+  </div>
+  <div class="content">
+    <!-- 路线预览 -->
+    <div class="confirm-map">
+      <div class="route-visual">
+        <div class="route-point">
+          <div class="route-point-dot s"></div>
+          <div class="route-point-label" id="confirm-start">当前位置</div>
+        </div>
+        <div class="route-line-h"></div>
+        <div class="car-on-route pulse">🚗</div>
+        <div class="route-line-h"></div>
+        <div class="route-point">
+          <div class="route-point-dot e"></div>
+          <div class="route-point-label" id="confirm-end">目的地</div>
+        </div>
+      </div>
+      <div id="route-info" style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.95);padding:6px 16px;border-radius:12px;font-size:12px;color:#555;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+        预计 <b style="color:var(--primary);" id="route-time">--分钟</b> · 约 <b id="route-distance">--km</b>
+      </div>
+    </div>
+
+    <!-- 车型选择 -->
+    <div class="confirm-section">
+      <div class="confirm-section-title">选择车型</div>
+      <div class="car-type-list">
+        <div class="car-type-item selected" onclick="selectCarType(this, 28)">
+          <div class="car-type-icon">🚗</div>
+          <div class="car-type-info">
+            <div class="car-type-name">经济快车</div>
+            <div class="car-type-desc">4座 · 舒适经济</div>
+            <span class="car-type-wait">⏱ 约2分钟到达</span>
+          </div>
+          <div class="car-type-price">
+            <div class="price">¥<span id="price-jj">28</span></div>
+            <div class="origin-price">¥36</div>
+          </div>
+          <div class="car-type-radio checked" id="radio-jj"></div>
+        </div>
+        <div class="car-type-item" onclick="selectCarType(this, 45)">
+          <div class="car-type-icon">🚙</div>
+          <div class="car-type-info">
+            <div class="car-type-name">舒适型</div>
+            <div class="car-type-desc">4座 · 商务舒适</div>
+            <span class="car-type-wait">⏱ 约4分钟到达</span>
+          </div>
+          <div class="car-type-price">
+            <div class="price">¥<span>45</span></div>
+          </div>
+          <div class="car-type-radio" id="radio-sc"></div>
+        </div>
+        <div class="car-type-item" onclick="selectCarType(this, 68)">
+          <div class="car-type-icon">🏎</div>
+          <div class="car-type-info">
+            <div class="car-type-name">豪华型</div>
+            <div class="car-type-desc">5座 · 豪华体验</div>
+            <span class="car-type-wait">⏱ 约7分钟到达</span>
+          </div>
+          <div class="car-type-price">
+            <div class="price">¥<span>68</span></div>
+          </div>
+          <div class="car-type-radio" id="radio-hh"></div>
+        </div>
+        <div class="car-type-item" onclick="selectCarType(this, 35)">
+          <div class="car-type-icon">🚐</div>
+          <div class="car-type-info">
+            <div class="car-type-name">商务型</div>
+            <div class="car-type-desc">6座 · 宽敞多人</div>
+            <span class="car-type-wait">⏱ 约5分钟到达</span>
+          </div>
+          <div class="car-type-price">
+            <div class="price">¥<span>35</span></div>
+          </div>
+          <div class="car-type-radio" id="radio-sw"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 支付方式 -->
+    <div class="confirm-section" style="margin-top:10px;">
+      <div class="confirm-section-title">支付与优惠</div>
+      <div class="pay-row" onclick="showToast('切换支付方式')">
+        <div class="pay-icon">💚</div>
+        <div class="pay-label">微信支付</div>
+        <div class="pay-right">更换 ›</div>
+      </div>
+      <div class="coupon-row" onclick="showToast('选择优惠券')">
+        <div class="pay-icon">🎫</div>
+        <div class="pay-label">优惠券</div>
+        <span class="coupon-tag">-¥15 可用</span>
+        <div class="pay-right" style="margin-left:auto;">› </div>
+      </div>
+    </div>
+
+    <!-- 备注 -->
+    <div class="confirm-section" style="margin-top:10px;">
+      <div class="confirm-section-title">行程备注</div>
+      <div style="padding:12px 16px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span onclick="toggleNote(this)" style="padding:6px 12px;border:1.5px solid var(--border);border-radius:18px;font-size:13px;cursor:pointer;color:var(--text-gray);">需要发票</span>
+          <span onclick="toggleNote(this)" style="padding:6px 12px;border:1.5px solid var(--border);border-radius:18px;font-size:13px;cursor:pointer;color:var(--text-gray);">帮忙拿行李</span>
+          <span onclick="toggleNote(this)" style="padding:6px 12px;border:1.5px solid var(--border);border-radius:18px;font-size:13px;cursor:pointer;color:var(--text-gray);">等候片刻</span>
+          <span onclick="toggleNote(this)" style="padding:6px 12px;border:1.5px solid var(--border);border-radius:18px;font-size:13px;cursor:pointer;color:var(--text-gray);">有宠物同行</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:90px;"></div>
+  </div>
+
+  <!-- 底部确认 -->
+  <div class="confirm-footer">
+    <div class="confirm-total">
+      <div class="confirm-total-price">¥<span id="confirm-price">28</span></div>
+      <div class="confirm-total-label">已减¥8 · 含基础保险</div>
+    </div>
+    <button class="confirm-order-btn" onclick="placeOrder()">确认叫车</button>
+  </div>
+</div>
+
+<!-- ===== 叫车中 / 行程页 ===== -->
+<div id="page-calling" class="page">
+  <div class="status-bar">
+    <span class="time">22:00</span>
+    <span id="calling-nav-title">正在呼叫司机</span>
+    <div class="icons"></div>
+  </div>
+
+  <!-- 地图区域 -->
+  <div class="map-area" id="map-container">
+    <!-- 高德地图容器 -->
+    <div id="amap-container" style="width:100%;height:100%;"></div>
+    <!-- 定位按钮 -->
+    <div style="position:absolute;right:12px;bottom:120px;width:36px;height:36px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer;z-index:10;" onclick="recenterMap()">📍</div>
+    <!-- 当前位置显示 -->
+    <div id="map-location-info" style="position:absolute;top:12px;left:12px;right:60px;background:rgba(255,255,255,0.95);padding:10px 14px;border-radius:10px;font-size:13px;color:var(--text-dark);box-shadow:0 2px 8px rgba(0,0,0,0.1);z-index:10;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="color:var(--primary);">📍</span>
+        <span id="map-current-addr">正在获取位置...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部信息卡 -->
+  <div class="calling-card slide-up">
+    <!-- 呼叫状态 -->
+    <div class="calling-status" id="calling-status-area">
+      <div class="calling-spinner" id="calling-spinner"></div>
+      <div class="calling-title" id="calling-title">正在为您匹配司机...</div>
+      <div class="calling-sub" id="calling-sub">已有3位司机抢单中</div>
+    </div>
+
+    <!-- 行程进度 (隐藏，等匹配成功后显示) -->
+    <div id="trip-progress" style="display:none;margin-bottom:12px;">
+      <div class="trip-steps">
+        <div class="trip-step done" id="step1">
+          <div class="trip-step-dot"></div>
+          <span>匹配成功</span>
+        </div>
+        <div class="trip-step current" id="step2">
+          <div class="trip-step-dot"></div>
+          <span>司机前往</span>
+        </div>
+        <div class="trip-step" id="step3">
+          <div class="trip-step-dot"></div>
+          <span>行程中</span>
+        </div>
+        <div class="trip-step" id="step4">
+          <div class="trip-step-dot"></div>
+          <span>已到达</span>
+        </div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:35%"></div></div>
+    </div>
+
+    <!-- 司机信息 -->
+    <div class="driver-info" id="driver-info" style="display:none;">
+      <div class="driver-avatar">👨</div>
+      <div class="driver-detail">
+        <div class="driver-name">张师傅</div>
+        <div class="driver-meta">贵A·12345 · 经济快车</div>
+        <div class="driver-rating">
+          <span class="stars">★★★★★</span>
+          <span class="rating-text">4.9分 · 已接单1286次</span>
+        </div>
+      </div>
+      <div>
+        <div class="driver-plate">贵A12345</div>
+        <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end;">
+          <div style="width:36px;height:36px;background:var(--primary-light);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;" onclick="showToast('正在拨号')">📞</div>
+          <div style="width:36px;height:36px;background:#fff3e0;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;" onclick="showToast('发送消息')">💬</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 行程信息 -->
+    <div id="trip-details" style="display:none;">
+      <div class="trip-detail-row">
+        <span class="trip-detail-label">上车地点</span>
+        <span class="trip-detail-val" id="detail-start">贵阳市南明区</span>
+      </div>
+      <div class="trip-detail-row">
+        <span class="trip-detail-label">目的地</span>
+        <span class="trip-detail-val" id="detail-end">贵阳北站</span>
+      </div>
+      <div class="trip-detail-row">
+        <span class="trip-detail-label" id="trip-eta-label">预计到达</span>
+        <span class="trip-detail-val" id="trip-eta">约2分钟后</span>
+      </div>
+    </div>
+
+    <button class="cancel-btn" id="cancel-btn" onclick="cancelTrip()">取消行程</button>
+  </div>
+</div>
+
+<!-- ===== 订单列表页 ===== -->
+<div id="page-orders" class="page">
+  <div class="status-bar">
+    <span class="time">22:00</span>
+    <span>我的行程</span>
+    <div class="icons"></div>
+  </div>
+  <div style="background:white;padding:12px 16px;border-bottom:1px solid var(--border);">
+    <div style="font-size:18px;font-weight:600;">我的行程</div>
+  </div>
+
+  <!-- 标签页 -->
+  <div class="order-tabs">
+    <div class="order-tab active" onclick="switchOrderTab(this, 'all')">全部</div>
+    <div class="order-tab" onclick="switchOrderTab(this, 'ongoing')">进行中</div>
+    <div class="order-tab" onclick="switchOrderTab(this, 'completed')">已完成</div>
+    <div class="order-tab" onclick="switchOrderTab(this, 'cancelled')">已取消</div>
+  </div>
+
+  <div class="content" id="orders-content">
+    <!-- 由 renderUserOrders() 动态填充 -->
+    <div style="text-align:center;padding:60px 20px;color:#bbb;">
+      <div style="font-size:48px;margin-bottom:12px;">📭</div>
+      <div style="font-size:15px;">登录后查看行程记录</div>
+    </div>
+    <div style="height:80px;"></div>
+  </div>
+</div>
+
+<!-- ===== 我的页面 ===== -->
+<div id="page-mine" class="page">
+  <div class="status-bar">
+    <span class="time">22:00</span>
+    <span>我的</span>
+    <div class="icons"></div>
+  </div>
+  <div class="content">
+    <!-- 用户信息 -->
+    <div class="mine-header">
+      <!-- 未登录状态 -->
+      <div id="mine-not-login" style="display:flex;flex-direction:column;align-items:center;padding:10px 0;">
+        <div style="width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:36px;border:2px solid rgba(255,255,255,0.5);margin-bottom:14px;">👤</div>
+        <div style="color:white;font-size:16px;font-weight:500;margin-bottom:4px;">你好，请登录</div>
+        <div style="color:rgba(255,255,255,0.75);font-size:12px;margin-bottom:16px;">登录后享受完整出行服务</div>
+        <button class="mine-login-btn" onclick="showLoginModal()">微信登录 / 手机登录</button>
+      </div>
+      <!-- 已登录状态 -->
+      <div id="mine-logged-in" style="display:none;">
+        <div class="mine-user-row">
+          <div class="mine-avatar" id="mine-avatar">😊</div>
+          <div class="mine-user-info">
+            <div class="name" id="mine-name">抖约用户</div>
+            <div class="phone" id="mine-phone">+86 138****8888</div>
+            <div id="mine-level-badge" style="display:inline-block;margin-top:5px;font-size:11px;background:rgba(255,255,255,0.25);color:white;padding:2px 8px;border-radius:10px;">🏅 普通会员</div>
+          </div>
+          <div style="color:rgba(255,255,255,0.8);font-size:22px;cursor:pointer;" onclick="showToast('编辑资料')">›</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计数据 -->
+    <div class="mine-stats">
+      <div class="mine-stat-item">
+        <div class="mine-stat-num">--</div>
+        <div class="mine-stat-label">累计行程</div>
+      </div>
+      <div class="mine-stat-item">
+        <div class="mine-stat-num">--</div>
+        <div class="mine-stat-label">累计优惠</div>
+      </div>
+      <div class="mine-stat-item">
+        <div class="mine-stat-num">--</div>
+        <div class="mine-stat-label">综合评分</div>
+      </div>
+    </div>
+
+    <!-- 钱包卡片 -->
+    <div class="wallet-card" onclick="showToast('我的钱包')">
+      <div class="wallet-title">我的余额</div>
+      <div class="wallet-balance">--</div>
+      <div class="wallet-actions">
+        <div class="wallet-btn" onclick="event.stopPropagation();showToast('充值')">充值</div>
+        <div class="wallet-btn" onclick="event.stopPropagation();showToast('提现')">提现</div>
+        <div class="wallet-btn" onclick="event.stopPropagation();showToast('明细')">明细</div>
+      </div>
+    </div>
+
+    <!-- 菜单列表 -->
+    <div class="mine-menu">
+      <div class="mine-menu-item" onclick="showToast('我的优惠券')">
+        <div class="mine-menu-icon" style="background:#fff3e0;">🎫</div>
+        <div class="mine-menu-label">我的优惠券</div>
+        <div class="mine-menu-right"><span class="mine-menu-badge" style="display:none;">0张</span> ›</div>
+      </div>
+      <div class="mine-menu-item" onclick="showToast('常用地址')">
+        <div class="mine-menu-icon" style="background:#e8f5e9;">📍</div>
+        <div class="mine-menu-label">常用地址</div>
+        <div class="mine-menu-right">管理 ›</div>
+      </div>
+      <div class="mine-menu-item" onclick="showToast('邀请好友')">
+        <div class="mine-menu-icon" style="background:#fce4ec;">🎁</div>
+        <div class="mine-menu-label">邀请好友</div>
+        <div class="mine-menu-right">得现金 ›</div>
+      </div>
+      <div class="mine-menu-item" onclick="showToast('安全中心')">
+        <div class="mine-menu-icon" style="background:#e3f2fd;">🛡</div>
+        <div class="mine-menu-label">安全中心</div>
+        <div class="mine-menu-right">›</div>
+      </div>
+      <div class="mine-menu-item" onclick="showToast('客服中心')">
+        <div class="mine-menu-icon" style="background:#f3e5f5;">💬</div>
+        <div class="mine-menu-label">联系客服</div>
+        <div class="mine-menu-right">7×24小时 ›</div>
+      </div>
+      <div class="mine-menu-item" onclick="showToast('关于抖约出行')">
+        <div class="mine-menu-icon" style="background:#e0f7fa;">ℹ️</div>
+        <div class="mine-menu-label">关于抖约出行</div>
+        <div class="mine-menu-right">v2.3.1 ›</div>
+      </div>
+      <!-- 管理员后台（仅管理员可见） -->
+      <div class="mine-menu-item" id="admin-menu-item" onclick="enterAdminPage()" style="display:none;border-top:4px solid #f5f5f5;margin-top:4px;">
+        <div class="mine-menu-icon" style="background:#e8eaf6;">🛠️</div>
+        <div class="mine-menu-label" style="color:#5c6bc0;font-weight:600;">管理员后台</div>
+        <div class="mine-menu-right" style="color:#5c6bc0;">进入 ›</div>
+      </div>
+      <!-- 退出登录（登录状态才显示） -->
+      <div class="mine-menu-item" id="logout-btn" style="display:none;" onclick="logoutUser()">
+        <div class="mine-menu-icon" style="background:#fce4ec;">🚪</div>
+        <div class="mine-menu-label" style="color:#f44336;">退出登录</div>
+        <div class="mine-menu-right">›</div>
+      </div>
+    </div>
+    <div style="height:80px;"></div>
+  </div>
+</div>
+
+<!-- ===== 底部Tab栏 ===== -->
+<div class="tab-bar" id="tab-bar">
+  <div class="tab-item active" id="tab-home" onclick="switchTab('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+      <path d="M9 21V12h6v9"/>
+    </svg>
+    <span>首页</span>
+  </div>
+  <div class="tab-item" id="tab-orders" onclick="switchTab('orders')" style="position:relative;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="5" y="2" width="14" height="20" rx="2"/>
+      <path d="M9 7h6M9 11h6M9 15h4"/>
+    </svg>
+    <span>行程</span>
+    <div class="tab-dot" id="order-badge" style="display:none;"></div>
+  </div>
+  <div class="tab-item" id="tab-mine" onclick="switchTab('mine')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+    <span>我的</span>
+  </div>
+</div>
+
+<!-- ===== 拖动地图选点页面 ===== -->
+<div id="page-pick-map" class="page" style="position:fixed;inset:0;z-index:500;max-width:390px;margin:0 auto;">
+  <!-- 地图容器 -->
+  <div class="pick-map-container">
+    <div id="pick-amap"></div>
+  </div>
+
+  <!-- 顶部导航 -->
+  <div class="pick-map-header">
+    <div class="pick-map-back" onclick="closePickMap()">←</div>
+    <div class="pick-map-title" id="pick-map-title">拖动地图选择上车地点</div>
+  </div>
+
+  <!-- 中心Pin图标 -->
+  <div class="pick-map-pin" id="pick-map-pin">
+    <svg class="pick-map-pin-icon" viewBox="0 0 38 48" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="19" cy="45" rx="7" ry="3" fill="rgba(0,0,0,0.15)"/>
+      <path d="M19 2C11.27 2 5 8.27 5 16c0 10.5 14 30 14 30s14-19.5 14-30C33 8.27 26.73 2 19 2z" fill="#00b36b"/>
+      <circle cx="19" cy="16" r="6" fill="white"/>
+      <circle cx="19" cy="16" r="3.5" fill="#00b36b"/>
+    </svg>
+    <div class="pick-map-pin-shadow"></div>
+  </div>
+
+  <!-- 底部信息面板 -->
+  <div class="pick-map-bottom">
+    <div class="pick-map-bottom-handle"></div>
+
+    <!-- 搜索快捷入口 -->
+    <div class="pick-map-search-bar" onclick="openAddressPage(pickMapTarget || 'start');closePickMap(true)">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#999" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+      <span>搜索地点...</span>
+    </div>
+
+    <div class="pick-map-addr-label">当前选择位置</div>
+    <div class="pick-map-addr-text" id="pick-map-addr-text">
+      正在获取地址...
+      <div class="pick-map-addr-sub" id="pick-map-addr-sub"></div>
+    </div>
+
+    <button class="pick-map-confirm-btn" onclick="confirmPickLocation()">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      确认此位置
+    </button>
+  </div>
+</div>
+
+<!-- ===== 微信登录弹窗 ===== -->
+<div class="login-modal-overlay" id="login-modal" onclick="handleLoginOverlayClick(event)">
+  <div class="login-modal" id="login-modal-sheet">
+    <div class="login-modal-handle"></div>
+    <div class="login-modal-body">
+      <div class="login-modal-close" onclick="closeLoginModal()">×</div>
+
+      <!-- Logo -->
+      <div class="login-logo">🚗</div>
+      <div class="login-title">欢迎使用抖约出行</div>
+      <div class="login-sub">登录后享受完整出行服务</div>
+
+      <!-- 微信登录 -->
+      <button class="login-wechat-btn" onclick="loginWithWechat()">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8.8 9.5c.5 0 .9-.4.9-.9s-.4-.9-.9-.9-.9.4-.9.9.4.9.9.9zm4.4 0c.5 0 .9-.4.9-.9s-.4-.9-.9-.9-.9.4-.9.9.4.9.9.9zM21.5 14.8c0-3.1-3-5.6-6.7-5.6-3.7 0-6.7 2.5-6.7 5.6 0 3.1 3 5.6 6.7 5.6.7 0 1.4-.1 2-.3l2.3 1.1-.6-2c1.3-1 2-2.5 2-4.4zm-9-1c-.4 0-.8-.3-.8-.8 0-.4.3-.8.8-.8s.8.3.8.8c0 .4-.3.8-.8.8zm4.3 0c-.4 0-.8-.3-.8-.8 0-.4.3-.8.8-.8s.8.3.8.8c0 .4-.4.8-.8.8zM3.3 13.8l-.5 1.8 2-1c.5.2 1 .3 1.5.3 3.3 0 6-2.2 6-5-.1-2.7-2.7-4.9-6-4.9S.3 7.2.3 9.9c0 1.6.8 3 2 3.9z"/>
+        </svg>
+        微信一键登录
+      </button>
+
+      <!-- 手机号登录入口 -->
+      <button class="login-phone-btn" id="phone-login-toggle" onclick="togglePhoneLogin()">
+        📱 手机号登录
+      </button>
+
+      <!-- 手机号登录表单 -->
+      <div class="phone-login-wrap" id="phone-login-wrap">
+        <div class="phone-input-group">
+          <input class="phone-input" id="phone-input" type="tel" maxlength="11" placeholder="请输入手机号" oninput="checkPhoneInput()" />
+          <button class="sms-btn" id="sms-btn" onclick="sendSmsCode()" disabled>获取验证码</button>
+        </div>
+        <div class="phone-input-group" id="sms-code-group" style="display:none;">
+          <input class="phone-input" id="sms-input" type="number" maxlength="6" placeholder="请输入6位验证码" />
+        </div>
+        <button class="phone-login-submit" onclick="submitPhoneLogin()">登录</button>
+        <div style="height:12px;"></div>
+      </div>
+
+      <div class="login-agreement">
+        登录即代表您同意 <a href="#">《用户服务协议》</a> 和 <a href="#">《隐私政策》</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 城市选择弹窗 ===== -->
+<div class="modal-overlay" id="city-modal" onclick="closeCityModal(event)">
+  <div class="modal-sheet" style="max-height:70vh;overflow-y:auto;">
+    <div class="modal-handle"></div>
+    <div class="modal-title">选择城市</div>
+    
+    <!-- 定位城市 -->
+    <div style="font-size:12px;color:var(--text-gray);margin-bottom:12px;">📍 定位城市</div>
+    <div class="city-list">
+      <div class="city-chip" id="locate-city-chip" onclick="selectCity(currentCity.name)" style="border-color:var(--primary);color:var(--primary);">
+        <span id="locate-city-name">正在定位...</span>
+      </div>
+    </div>
+    
+    <!-- 热门城市 -->
+    <div style="font-size:12px;color:var(--text-gray);margin:16px 0 12px;">🔥 热门城市</div>
+    <div class="city-list">
+      <div class="city-chip" onclick="selectCity('北京市')">北京市</div>
+      <div class="city-chip" onclick="selectCity('上海市')">上海市</div>
+      <div class="city-chip" onclick="selectCity('广州市')">广州市</div>
+      <div class="city-chip" onclick="selectCity('深圳市')">深圳市</div>
+      <div class="city-chip" onclick="selectCity('成都市')">成都市</div>
+      <div class="city-chip" onclick="selectCity('杭州市')">杭州市</div>
+      <div class="city-chip" onclick="selectCity('武汉市')">武汉市</div>
+      <div class="city-chip" onclick="selectCity('西安市')">西安市</div>
+      <div class="city-chip" onclick="selectCity('重庆市')">重庆市</div>
+    </div>
+    
+    <!-- 贵州省 -->
+    <div style="font-size:12px;color:var(--text-gray);margin:16px 0 12px;">📍 贵州省</div>
+    <div class="city-list">
+      <div class="city-chip active" onclick="selectCity('贵阳市')">贵阳市</div>
+      <div class="city-chip" onclick="selectCity('遵义市')">遵义市</div>
+      <div class="city-chip" onclick="selectCity('安顺市')">安顺市</div>
+      <div class="city-chip" onclick="selectCity('毕节市')">毕节市</div>
+      <div class="city-chip" onclick="selectCity('铜仁市')">铜仁市</div>
+      <div class="city-chip" onclick="selectCity('凯里市')">凯里市</div>
+      <div class="city-chip" onclick="selectCity('都匀市')">都匀市</div>
+      <div class="city-chip" onclick="selectCity('兴义市')">兴义市</div>
+      <div class="city-chip" onclick="selectCity('六盘水市')">六盘水市</div>
+    </div>
+    
+    <!-- 华北 -->
+    <div style="font-size:12px;color:var(--text-gray);margin:16px 0 12px;">华北</div>
+    <div class="city-list">
+      <div class="city-chip" onclick="selectCity('天津市')">天津市</div>
+      <div class="city-chip" onclick="selectCity('石家庄市')">石家庄市</div>
+      <div class="city-chip" onclick="selectCity('太原市')">太原市</div>
+      <div class="city-chip" onclick="selectCity('呼和浩特市')">呼和浩特市</div>
+      <div class="city-chip" onclick="selectCity('唐山市')">唐山市</div>
+      <div class="city-chip" onclick="selectCity('保定市')">保定市</div>
+    </div>
+    
+    <!-- 华东 -->
+    <div style="font-size:12px;color:var(--text-gray);margin:16px 0 12px;">华东</div>
+    <div class="city-list">
+      <div class="city-chip" onclick="selectCity('南京市')">南京市</div>
+      <div class="city-chip" onclick="selectCity('苏州市')">苏州市</div>
+      <div class="city-chip" onclick="selectCity('无锡市')">无锡市</div>
+      <div class="city-chip" onclick="selectCity('宁波市')">宁波市</div>
+      <div class="city-chip" onclick="selectCity('合肥市')">合肥市</div>
+      <div class="city-chip" onclick="selectCity('济南市')">济南市</div>
+      <div class="city-chip" onclick="selectCity('青岛市')">青岛市</div>
+      <div class="city-chip" onclick="selectCity('福州市')">福州市</div>
+      <div class="city-chip" onclick="selectCity('厦门市')">厦门市</div>
+    </div>
+    
+    <!-- 华南 -->
+    <div style="font-size:12px;color:var(--text-gray);margin:16px 0 12px;">华南</div>
+    <div class="city-list">
+      <div class="city-chip" onclick="selectCity('南宁市')">南宁市</div>
+      <div class="city-chip" onclick="selectCity('百色市')">百色市</div>
+      <div class="city-chip" onclick="selectCity('隆林县')">隆林县</div>
+      <div class="city-chip" onclick="selectCity('海口市')">海口市</div>
+      <div class="city-chip" onclick="selectCity('三亚市')">三亚市</div>
+      <div class="city-chip" onclick="selectCity('佛山市')">佛山市</div>
+      <div class="city-chip" onclick="selectCity('东莞市')">东莞市</div>
+      <div class="city-chip" onclick="selectCity('珠海市')">珠海市</div>
+    </div>
+    
+    <!-- 华中 -->
+    <div style="font-size:12px;color:var(--text-gray);margin:16px 0 12px;">华中</div>
+    <div class="city-list">
+      <div class="city-chip" onclick="selectCity('长沙市')">长沙市</div>
+      <div class="city-chip" onclick="selectCity('郑州市')">郑州市</div>
+      <div class="city-chip" onclick="selectCity('南昌市')">南昌市</div>
+      <div class="city-chip" onclick="selectCity('洛阳市')">洛阳市</div>
+      <div class="city-chip" onclick="selectCity('襄阳市')">襄阳市</div>
+    </div>
+    
+    <!-- 西南 -->
+    <div style="font-size:12px;color:var(--text-gray);margin:16px 0 12px;">西南</div>
+    <div class="city-list">
+      <div class="city-chip" onclick="selectCity('昆明市')">昆明市</div>
+      <div class="city-chip" onclick="selectCity('拉萨市')">拉萨市</div>
+      <div class="city-chip" onclick="selectCity('绵阳市')">绵阳市</div>
+      <div class="city-chip" onclick="selectCity('南充市')">南充市</div>
+      <div class="city-chip" onclick="selectCity('宜宾市')">宜宾市</div>
+    </div>
+    
+    <!-- 西北 -->
+    <div style="font-size:12px;color:var(--text-gray);margin:16px 0 12px;">西北</div>
+    <div class="city-list">
+      <div class="city-chip" onclick="selectCity('兰州市')">兰州市</div>
+      <div class="city-chip" onclick="selectCity('西宁市')">西宁市</div>
+      <div class="city-chip" onclick="selectCity('银川市')">银川市</div>
+      <div class="city-chip" onclick="selectCity('乌鲁木齐市')">乌鲁木齐市</div>
+      <div class="city-chip" onclick="selectCity('咸阳市')">咸阳市</div>
+      <div class="city-chip" onclick="selectCity('宝鸡市')">宝鸡市</div>
+    </div>
+    
+    <!-- 东北 -->
+    <div style="font-size:12px;color:var(--text-gray);margin:16px 0 12px;">东北</div>
+    <div class="city-list">
+      <div class="city-chip" onclick="selectCity('沈阳市')">沈阳市</div>
+      <div class="city-chip" onclick="selectCity('大连市')">大连市</div>
+      <div class="city-chip" onclick="selectCity('长春市')">长春市</div>
+      <div class="city-chip" onclick="selectCity('哈尔滨市')">哈尔滨市</div>
+      <div class="city-chip" onclick="selectCity('吉林市')">吉林市</div>
+      <div class="city-chip" onclick="selectCity('大庆市')">大庆市</div>
+    </div>
+    
+    <div style="height:20px;"></div>
+  </div>
+</div>
+
+<!-- ===== 评价弹窗 ===== -->
+<div class="modal-overlay" id="rate-modal" onclick="closeRateModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">为本次行程评分</div>
+    <div style="text-align:center;margin-bottom:8px;color:var(--text-gray);font-size:13px;">张师傅为您服务</div>
+    <div class="rate-stars" id="rate-stars">
+      <span class="rate-star" onclick="setRating(1)">⭐</span>
+      <span class="rate-star" onclick="setRating(2)">⭐</span>
+      <span class="rate-star" onclick="setRating(3)">⭐</span>
+      <span class="rate-star" onclick="setRating(4)">⭐</span>
+      <span class="rate-star" onclick="setRating(5)">⭐</span>
+    </div>
+    <div class="rate-tags">
+      <span class="rate-tag" onclick="toggleRateTag(this)">服务热情</span>
+      <span class="rate-tag" onclick="toggleRateTag(this)">行车安全</span>
+      <span class="rate-tag" onclick="toggleRateTag(this)">准时到达</span>
+      <span class="rate-tag" onclick="toggleRateTag(this)">车内整洁</span>
+      <span class="rate-tag" onclick="toggleRateTag(this)">路线合理</span>
+      <span class="rate-tag" onclick="toggleRateTag(this)">沟通顺畅</span>
+    </div>
+    <button class="rate-submit" onclick="submitRate()">提交评价</button>
+  </div>
+</div>
+
+<!-- ===== Toast ===== -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===== 状态管理 =====
+  let currentPage = 'home';
+  let currentTab = 'home';
+  let pageHistory = [];
+  let selectedStart = '';
+  let selectedEnd = '';
+  let addressTarget = 'end';
+  let selectedPrice = 28;
+  let orderPlaced = false;
+  let tripSimTimer = null;
+  let currentTripStep = 0;
+  let isLocating = false;
+  let currentCity = { name: '贵阳市', lat: 26.57, lng: 106.71, adcode: '520100' };
+
+  // 全国主要城市数据
+  const cityData = {
+    // 直辖市
+    '北京市': { lat: 39.90, lng: 116.40, adcode: '110000' },
+    '上海市': { lat: 31.23, lng: 121.47, adcode: '310000' },
+    '天津市': { lat: 39.12, lng: 117.20, adcode: '120000' },
+    '重庆市': { lat: 29.56, lng: 106.55, adcode: '500000' },
+    
+    // 贵州省
+    '贵阳市': { lat: 26.57, lng: 106.71, adcode: '520100' },
+    '遵义市': { lat: 27.69, lng: 106.93, adcode: '520300' },
+    '安顺市': { lat: 26.25, lng: 105.95, adcode: '520400' },
+    '毕节市': { lat: 27.30, lng: 105.29, adcode: '520500' },
+    '铜仁市': { lat: 27.73, lng: 109.19, adcode: '520600' },
+    '六盘水市': { lat: 26.59, lng: 104.83, adcode: '520200' },
+    '凯里市': { lat: 26.59, lng: 107.98, adcode: '522601' },
+    '都匀市': { lat: 26.26, lng: 107.52, adcode: '522701' },
+    '兴义市': { lat: 25.09, lng: 104.90, adcode: '522301' },
+    
+    // 广东省
+    '广州市': { lat: 23.13, lng: 113.26, adcode: '440100' },
+    '深圳市': { lat: 22.54, lng: 114.06, adcode: '440300' },
+    '佛山市': { lat: 23.02, lng: 113.12, adcode: '440600' },
+    '东莞市': { lat: 23.05, lng: 113.75, adcode: '441900' },
+    '珠海市': { lat: 22.27, lng: 113.57, adcode: '440400' },
+    
+    // 江苏省
+    '南京市': { lat: 32.06, lng: 118.78, adcode: '320100' },
+    '苏州市': { lat: 31.30, lng: 120.58, adcode: '320500' },
+    '无锡市': { lat: 31.57, lng: 120.30, adcode: '320200' },
+    
+    // 浙江省
+    '杭州市': { lat: 30.27, lng: 120.15, adcode: '330100' },
+    '宁波市': { lat: 29.87, lng: 121.55, adcode: '330200' },
+    
+    // 四川省
+    '成都市': { lat: 30.57, lng: 104.07, adcode: '510100' },
+    '绵阳市': { lat: 31.47, lng: 104.68, adcode: '510700' },
+    '南充市': { lat: 30.79, lng: 106.08, adcode: '511300' },
+    '宜宾市': { lat: 28.77, lng: 104.62, adcode: '511500' },
+    
+    // 湖北省
+    '武汉市': { lat: 30.59, lng: 114.31, adcode: '420100' },
+    '襄阳市': { lat: 32.01, lng: 112.12, adcode: '420600' },
+    
+    // 湖南省
+    '长沙市': { lat: 28.23, lng: 112.98, adcode: '430100' },
+    
+    // 河南省
+    '郑州市': { lat: 34.75, lng: 113.63, adcode: '410100' },
+    '洛阳市': { lat: 34.62, lng: 112.45, adcode: '410300' },
+    
+    // 山东省
+    '济南市': { lat: 36.65, lng: 117.12, adcode: '370100' },
+    '青岛市': { lat: 36.07, lng: 120.38, adcode: '370200' },
+    
+    // 福建省
+    '福州市': { lat: 26.08, lng: 119.30, adcode: '350100' },
+    '厦门市': { lat: 24.48, lng: 118.08, adcode: '350200' },
+    
+    // 安徽省
+    '合肥市': { lat: 31.87, lng: 117.28, adcode: '340100' },
+    
+    // 江西省
+    '南昌市': { lat: 28.68, lng: 115.88, adcode: '360100' },
+    
+    // 河北省
+    '石家庄市': { lat: 38.04, lng: 114.51, adcode: '130100' },
+    '唐山市': { lat: 39.63, lng: 118.18, adcode: '130200' },
+    '保定市': { lat: 38.87, lng: 115.47, adcode: '130600' },
+    
+    // 山西省
+    '太原市': { lat: 37.87, lng: 112.55, adcode: '140100' },
+    
+    // 内蒙古自治区
+    '呼和浩特市': { lat: 40.84, lng: 111.75, adcode: '150100' },
+    
+    // 辽宁省
+    '沈阳市': { lat: 41.80, lng: 123.43, adcode: '210100' },
+    '大连市': { lat: 38.91, lng: 121.62, adcode: '210200' },
+    '吉林市': { lat: 43.84, lng: 126.55, adcode: '220200' },
+    
+    // 吉林省
+    '长春市': { lat: 43.82, lng: 125.32, adcode: '220100' },
+    
+    // 黑龙江省
+    '哈尔滨市': { lat: 45.80, lng: 126.53, adcode: '230100' },
+    '大庆市': { lat: 46.59, lng: 125.00, adcode: '230600' },
+    
+    // 陕西省
+    '西安市': { lat: 34.34, lng: 108.94, adcode: '610100' },
+    '咸阳市': { lat: 34.33, lng: 108.71, adcode: '610400' },
+    '宝鸡市': { lat: 34.36, lng: 107.24, adcode: '610300' },
+    
+    // 甘肃省
+    '兰州市': { lat: 36.06, lng: 103.83, adcode: '620100' },
+    
+    // 青海省
+    '西宁市': { lat: 36.62, lng: 101.78, adcode: '630100' },
+    
+    // 宁夏回族自治区
+    '银川市': { lat: 38.49, lng: 106.23, adcode: '640100' },
+    
+    // 新疆维吾尔自治区
+    '乌鲁木齐市': { lat: 43.83, lng: 87.62, adcode: '650100' },
+    
+    // 云南省
+    '昆明市': { lat: 25.04, lng: 102.71, adcode: '530100' },
+    
+    // 西藏自治区
+    '拉萨市': { lat: 29.65, lng: 91.13, adcode: '540100' },
+    
+    // 广西壮族自治区
+    '南宁市': { lat: 22.82, lng: 108.32, adcode: '450100' },
+    '百色市': { lat: 23.90, lng: 106.62, adcode: '451000' },
+    '隆林县': { lat: 24.77, lng: 105.34, adcode: '451031' },
+    
+    // 海南省
+    '海口市': { lat: 20.02, lng: 110.35, adcode: '460100' },
+    '三亚市': { lat: 18.25, lng: 109.51, adcode: '460200' }
+  };
+
+  // 模拟地址库（贵州省各地点）
+  const mockLocations = [
+    // 贵阳市
+    { name: '贵阳市南明区花溪大道', city: '贵阳市', lat: 26.57, lng: 106.71 },
+    { name: '贵阳国际金融中心', city: '贵阳市', lat: 26.65, lng: 106.63 },
+    { name: '贵阳北站', city: '贵阳市', lat: 26.61, lng: 106.70 },
+    { name: '贵阳龙洞堡国际机场', city: '贵阳市', lat: 26.54, lng: 106.80 },
+    { name: '贵州省人民医院', city: '贵阳市', lat: 26.58, lng: 106.72 },
+    { name: '花溪公园', city: '贵阳市', lat: 26.44, lng: 106.67 },
+    { name: '观山湖万达广场', city: '贵阳市', lat: 26.65, lng: 106.62 },
+    { name: '贵州大学', city: '贵阳市', lat: 26.45, lng: 106.68 },
+    { name: '甲秀楼', city: '贵阳市', lat: 26.57, lng: 106.72 },
+    { name: '黔灵山公园', city: '贵阳市', lat: 26.59, lng: 106.69 },
+    { name: '贵阳火车站', city: '贵阳市', lat: 26.55, lng: 106.71 },
+    { name: '大十字', city: '贵阳市', lat: 26.58, lng: 106.72 },
+    { name: '喷水池', city: '贵阳市', lat: 26.59, lng: 106.71 },
+    { name: '花果园', city: '贵阳市', lat: 26.56, lng: 106.69 },
+    { name: '贵州省博物馆', city: '贵阳市', lat: 26.66, lng: 106.64 },
+    { name: '青岩古镇', city: '贵阳市', lat: 26.34, lng: 106.60 },
+    { name: '天河潭', city: '贵阳市', lat: 26.42, lng: 106.58 },
+    { name: '红枫湖', city: '贵阳市', lat: 26.55, lng: 106.45 },
+    { name: '南江大峡谷', city: '贵阳市', lat: 27.05, lng: 106.95 },
+    
+    // 遵义市
+    { name: '遵义会议会址', city: '遵义市', lat: 27.69, lng: 106.93 },
+    { name: '遵义新舟机场', city: '遵义市', lat: 27.80, lng: 107.25 },
+    { name: '遵义茅台机场', city: '遵义市', lat: 27.95, lng: 106.33 },
+    { name: '遵义火车站', city: '遵义市', lat: 27.70, lng: 106.92 },
+    { name: '遵义医学院附属医院', city: '遵义市', lat: 27.71, lng: 106.94 },
+    { name: '红军山烈士陵园', city: '遵义市', lat: 27.68, lng: 106.91 },
+    { name: '凤凰山国家森林公园', city: '遵义市', lat: 27.67, lng: 106.90 },
+    { name: '遵义老城步行街', city: '遵义市', lat: 27.69, lng: 106.92 },
+    { name: '汇川区人民路', city: '遵义市', lat: 27.72, lng: 106.93 },
+    { name: '新蒲新区', city: '遵义市', lat: 27.75, lng: 107.05 },
+    { name: '仁怀市茅台镇', city: '遵义市', lat: 27.81, lng: 106.37 },
+    { name: '赤水丹霞', city: '遵义市', lat: 28.55, lng: 105.70 },
+    
+    // 安顺市
+    { name: '安顺黄果树瀑布', city: '安顺市', lat: 25.99, lng: 105.67 },
+    { name: '安顺龙宫', city: '安顺市', lat: 26.12, lng: 105.88 },
+    { name: '安顺黄果树机场', city: '安顺市', lat: 26.26, lng: 105.87 },
+    { name: '安顺火车站', city: '安顺市', lat: 26.25, lng: 105.93 },
+    { name: '安顺市人民医院', city: '安顺市', lat: 26.25, lng: 105.95 },
+    { name: '安顺虹山湖公园', city: '安顺市', lat: 26.26, lng: 105.92 },
+    { name: '安顺塔山广场', city: '安顺市', lat: 26.24, lng: 105.93 },
+    { name: '安顺西秀区', city: '安顺市', lat: 26.25, lng: 105.94 },
+    { name: '平坝区', city: '安顺市', lat: 26.41, lng: 106.26 },
+    { name: '紫云格凸河', city: '安顺市', lat: 25.75, lng: 106.08 },
+    
+    // 毕节市
+    { name: '毕节飞雄机场', city: '毕节市', lat: 27.27, lng: 105.50 },
+    { name: '毕节火车站', city: '毕节市', lat: 27.30, lng: 105.28 },
+    { name: '毕节市第一人民医院', city: '毕节市', lat: 27.30, lng: 105.30 },
+    { name: '毕节百里杜鹃', city: '毕节市', lat: 27.15, lng: 105.85 },
+    { name: '毕节织金洞', city: '毕节市', lat: 26.78, lng: 105.88 },
+    { name: '毕节威宁草海', city: '毕节市', lat: 26.85, lng: 104.28 },
+    { name: '毕节七星关区', city: '毕节市', lat: 27.30, lng: 105.29 },
+    { name: '大方县奢香古镇', city: '毕节市', lat: 27.15, lng: 105.60 },
+    
+    // 铜仁市
+    { name: '铜仁凤凰机场', city: '铜仁市', lat: 27.88, lng: 109.31 },
+    { name: '铜仁火车站', city: '铜仁市', lat: 27.73, lng: 109.19 },
+    { name: '铜仁市人民医院', city: '铜仁市', lat: 27.73, lng: 109.20 },
+    { name: '铜仁梵净山', city: '铜仁市', lat: 27.91, lng: 108.77 },
+    { name: '铜仁中南门古城', city: '铜仁市', lat: 27.72, lng: 109.18 },
+    { name: '铜仁碧江区', city: '铜仁市', lat: 27.73, lng: 109.19 },
+    { name: '铜仁万山区', city: '铜仁市', lat: 27.52, lng: 109.21 },
+    { name: '铜仁大明边城', city: '铜仁市', lat: 27.74, lng: 109.22 },
+    { name: '石阡温泉', city: '铜仁市', lat: 27.52, lng: 108.23 },
+    
+    // 凯里市（黔东南州）
+    { name: '凯里千户苗寨', city: '凯里市', lat: 26.50, lng: 108.17 },
+    { name: '凯里黄平机场', city: '凯里市', lat: 26.97, lng: 107.98 },
+    { name: '凯里火车站', city: '凯里市', lat: 26.59, lng: 107.98 },
+    { name: '凯里南站', city: '凯里市', lat: 26.53, lng: 107.90 },
+    { name: '凯里市第一人民医院', city: '凯里市', lat: 26.59, lng: 107.98 },
+    { name: '凯里下司古镇', city: '凯里市', lat: 26.55, lng: 107.95 },
+    { name: '凯里大十字', city: '凯里市', lat: 26.59, lng: 107.98 },
+    { name: '镇远古镇', city: '凯里市', lat: 27.05, lng: 108.43 },
+    { name: '肇兴侗寨', city: '凯里市', lat: 25.91, lng: 109.17 },
+    { name: '荔波小七孔', city: '凯里市', lat: 25.42, lng: 107.88 },
+    
+    // 都匀市（黔南州）
+    { name: '都匀影视城', city: '都匀市', lat: 26.26, lng: 107.52 },
+    { name: '都匀火车站', city: '都匀市', lat: 26.26, lng: 107.52 },
+    { name: '都匀东站', city: '都匀市', lat: 26.32, lng: 107.60 },
+    { name: '都匀市人民医院', city: '都匀市', lat: 26.26, lng: 107.52 },
+    { name: '都匀石板古街', city: '都匀市', lat: 26.26, lng: 107.51 },
+    { name: '都匀文峰公园', city: '都匀市', lat: 26.26, lng: 107.53 },
+    { name: '都匀斗篷山', city: '都匀市', lat: 26.35, lng: 107.35 },
+    { name: '平塘天眼', city: '都匀市', lat: 25.65, lng: 106.86 },
+    
+    // 兴义市（黔西南州）
+    { name: '兴义万峰林', city: '兴义市', lat: 24.98, lng: 104.90 },
+    { name: '兴义万峰湖', city: '兴义市', lat: 24.95, lng: 104.95 },
+    { name: '兴义马岭河峡谷', city: '兴义市', lat: 25.10, lng: 104.95 },
+    { name: '兴义万峰林机场', city: '兴义市', lat: 25.09, lng: 104.96 },
+    { name: '兴义火车站', city: '兴义市', lat: 25.08, lng: 104.90 },
+    { name: '兴义市人民医院', city: '兴义市', lat: 25.09, lng: 104.90 },
+    { name: '兴义街心花园', city: '兴义市', lat: 25.09, lng: 104.90 },
+    { name: '兴义桔山广场', city: '兴义市', lat: 25.10, lng: 104.92 },
+    { name: '兴义贵州醇景区', city: '兴义市', lat: 25.08, lng: 104.93 },
+    { name: '晴隆二十四道拐', city: '兴义市', lat: 25.85, lng: 105.22 },
+    
+    // 六盘水市
+    { name: '六盘水月照机场', city: '六盘水市', lat: 26.61, lng: 104.97 },
+    { name: '六盘水火车站', city: '六盘水市', lat: 26.59, lng: 104.83 },
+    { name: '六盘水市人民医院', city: '六盘水市', lat: 26.59, lng: 104.84 },
+    { name: '六盘水钟山区', city: '六盘水市', lat: 26.59, lng: 104.83 },
+    { name: '六盘水水城古镇', city: '六盘水市', lat: 26.59, lng: 104.82 },
+    { name: '六盘水明湖湿地公园', city: '六盘水市', lat: 26.57, lng: 104.82 },
+    { name: '六盘水梅花山', city: '六盘水市', lat: 26.65, lng: 104.78 },
+    { name: '六盘水乌蒙大草原', city: '六盘水市', lat: 26.08, lng: 104.68 },
+    { name: '六盘水韭菜坪', city: '六盘水市', lat: 26.88, lng: 104.65 },
+    { name: '盘州市', city: '六盘水市', lat: 25.71, lng: 104.47 },
+    
+    // 广西百色市
+    { name: '百色站', city: '百色市', lat: 23.90, lng: 106.62 },
+    { name: '百色学院', city: '百色市', lat: 23.91, lng: 106.63 },
+    { name: '百色市人民医院', city: '百色市', lat: 23.90, lng: 106.61 },
+    { name: '百色起义纪念馆', city: '百色市', lat: 23.90, lng: 106.62 },
+    { name: '百色高铁站', city: '百色市', lat: 23.89, lng: 106.65 },
+    { name: '百色万达广场', city: '百色市', lat: 23.91, lng: 106.64 },
+    
+    // 广西百色市隆林县
+    { name: '隆林汽车站', city: '百色市', lat: 24.77, lng: 105.34 },
+    { name: '隆林县政府', city: '百色市', lat: 24.77, lng: 105.35 },
+    { name: '隆林县人民医院', city: '百色市', lat: 24.76, lng: 105.34 },
+    { name: '隆林民族中学', city: '百色市', lat: 24.78, lng: 105.35 },
+    { name: '隆林中心广场', city: '百色市', lat: 24.77, lng: 105.34 },
+    { name: '隆林天生桥', city: '百色市', lat: 24.85, lng: 105.28 },
+    { name: '隆林德峨镇', city: '百色市', lat: 24.65, lng: 105.18 },
+    { name: '隆林桠杈镇', city: '百色市', lat: 24.92, lng: 105.42 }
+  ];
+
+  // ===== 时间更新 =====
+  function updateTime() {
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2,'0');
+    const m = now.getMinutes().toString().padStart(2,'0');
+    const timeStr = h + ':' + m;
+    document.querySelectorAll('.status-bar .time').forEach(el => el.textContent = timeStr);
+  }
+  setInterval(updateTime, 10000);
+  updateTime();
+
+  // ===== 页面切换 =====
+  function switchPage(id, pushHistory) {
+    if (pushHistory !== false) pageHistory.push(currentPage);
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    currentPage = id;
+
+    // Tab栏显示/隐藏
+    const tabPages = ['home', 'orders', 'mine'];
+    document.getElementById('tab-bar').style.display = tabPages.includes(id) ? 'flex' : 'none';
+
+    // 进入地图选点页面时刷新地图大小
+    if (id === 'pick-map' && pickMap) {
+      setTimeout(() => { pickMap.resize(); }, 100);
+    }
+    // 进入管理后台时初始化
+    if (id === 'admin') {
+      setTimeout(() => initAdminPage(), 50);
+    }
+  }
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    pageHistory = [];
+    switchPage(tab === 'orders' ? 'orders' : tab === 'mine' ? 'mine' : 'home', false);
+  }
+
+  function goBack() {
+    if (pageHistory.length > 0) {
+      const prev = pageHistory.pop();
+      switchPage(prev, false);
+    }
+  }
+
+  // ===== 首页功能 =====
+  function selectTripType(el, type) {
+    document.querySelectorAll('.trip-type-btn').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+    currentTripType = type;
+    
+    // 更新车型描述以反映不同出行方式
+    updateCarTypeDescriptions(type);
+    
+    showToast('已选择' + type);
+  }
+  
+  // 根据出行方式更新车型描述
+  function updateCarTypeDescriptions(tripType) {
+    const descElements = document.querySelectorAll('.car-type-desc');
+    const nameElements = document.querySelectorAll('.car-type-name');
+    const waitElements = document.querySelectorAll('.car-type-wait');
+    
+    if (tripType === '顺风车') {
+      // 顺风车：拼车模式
+      if (nameElements[0]) nameElements[0].textContent = '经济拼车';
+      if (descElements[0]) descElements[0].textContent = '1人座 · 顺路拼车';
+      if (waitElements[0]) waitElements[0].textContent = '⏱ 约10分钟接人';
+      
+      if (nameElements[1]) nameElements[1].textContent = '舒适拼车';
+      if (descElements[1]) descElements[1].textContent = '1人座 · 空间稍大';
+      if (waitElements[1]) waitElements[1].textContent = '⏱ 约12分钟接人';
+      
+      if (nameElements[2]) nameElements[2].textContent = '豪华拼车';
+      if (descElements[2]) descElements[2].textContent = '1人座 · 品质出行';
+      if (waitElements[2]) waitElements[2].textContent = '⏱ 约15分钟接人';
+      
+      if (nameElements[3]) nameElements[3].textContent = '商务拼车';
+      if (descElements[3]) descElements[3].textContent = '2-3人座 · 可同行';
+      if (waitElements[3]) waitElements[3].textContent = '⏱ 约8分钟接人';
+    } else {
+      // 快车：专车模式
+      if (nameElements[0]) nameElements[0].textContent = '经济快车';
+      if (descElements[0]) descElements[0].textContent = '4座 · 舒适经济';
+      if (waitElements[0]) waitElements[0].textContent = '⏱ 约2分钟到达';
+      
+      if (nameElements[1]) nameElements[1].textContent = '舒适型';
+      if (descElements[1]) descElements[1].textContent = '4座 · 商务舒适';
+      if (waitElements[1]) waitElements[1].textContent = '⏱ 约4分钟到达';
+      
+      if (nameElements[2]) nameElements[2].textContent = '豪华型';
+      if (descElements[2]) descElements[2].textContent = '5座 · 豪华体验';
+      if (waitElements[2]) waitElements[2].textContent = '⏱ 约7分钟到达';
+      
+      if (nameElements[3]) nameElements[3].textContent = '商务型';
+      if (descElements[3]) descElements[3].textContent = '6座 · 宽敞多人';
+      if (waitElements[3]) waitElements[3].textContent = '⏱ 约5分钟到达';
+    }
+  }
+
+  // ===== 高德地图相关 =====
+  let map = null;
+  let currentMarker = null;
+  let startMarker = null;
+  let endMarker = null;
+  let carMarker = null;
+  let drivingRoute = null;
+
+  // 初始化高德地图
+  function initAMap() {
+    if (typeof AMap === 'undefined') {
+      console.log('高德地图API未加载');
+      showToast('地图加载失败，请检查网络');
+      return;
+    }
+    
+    console.log('高德地图API已加载，开始初始化...');
+    
+    // 使用当前城市中心点或默认贵阳市中心
+    const center = (currentCity && currentCity.lng) ? [currentCity.lng, currentCity.lat] : [106.71, 26.57];
+    
+    try {
+      map = new AMap.Map('amap-container', {
+        zoom: 14,
+        center: center,
+        viewMode: '2D'
+      });
+      
+      console.log('地图初始化成功');
+      
+      // 加载地图控件插件
+      AMap.plugin(['AMap.Scale', 'AMap.ToolBar'], function() {
+        map.addControl(new AMap.Scale());
+        map.addControl(new AMap.ToolBar({
+          position: 'RB',
+          offset: [10, 100]
+        }));
+        console.log('地图控件加载成功');
+      });
+    } catch (e) {
+      console.error('地图初始化失败:', e);
+      showToast('地图初始化失败');
+    }
+  }
+
+  // ===== 自动定位功能（使用高德定位插件）=====
+  let currentLat = null;
+  let currentLng = null;
+  let currentAddress = '';
+
+  function autoLocate() {
+    if (isLocating) return;
+    isLocating = true;
+    
+    const btn = document.getElementById('loc-btn');
+    const text = document.getElementById('loc-start');
+    btn.classList.add('locating');
+    btn.innerHTML = '<span class="locating-dot"></span>定位中';
+    text.textContent = '正在获取当前位置...';
+    text.style.color = 'var(--primary)';
+    
+    console.log('开始定位...');
+    
+    // 优先使用高德地图定位插件
+    if (typeof AMap !== 'undefined') {
+      console.log('加载高德定位插件...');
+      AMap.plugin('AMap.Geolocation', function() {
+        console.log('定位插件加载完成');
+        const geolocation = new AMap.Geolocation({
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 0,
+          convert: true,
+          buttonOffset: new AMap.Pixel(10, 20),
+          zoomToAccuracy: true,
+          position: 'RB',
+          panToLocation: true,
+          showCircle: true,
+          circleOptions: {
+            strokeColor: '#00b36b',
+            strokeOpacity: 0.5,
+            strokeWeight: 1,
+            fillColor: '#00b36b',
+            fillOpacity: 0.15
+          }
+        });
+        
+        if (map) {
+          map.addControl(geolocation);
+        }
+        
+        geolocation.getCurrentPosition(function(status, result) {
+          console.log('定位结果:', status, result);
+          if (status === 'complete') {
+            onLocateSuccess(result);
+          } else {
+            onLocateError(result);
+          }
+        });
+      });
+    } else {
+      console.log('高德API未加载，使用浏览器定位');
+      // 降级使用浏览器原生定位
+      useBrowserGeolocation();
+    }
+  }
+
+  // 浏览器原生定位（降级方案）
+  function useBrowserGeolocation() {
+    console.log('开始浏览器原生定位...');
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          console.log('浏览器定位成功:', position.coords);
+          const lng = position.coords.longitude;
+          const lat = position.coords.latitude;
+          
+          // 根据坐标判断大致城市
+          detectCityByCoordinates(lat, lng);
+          
+          // 使用高德逆地理编码
+          regeoCode(lng, lat);
+        },
+        (error) => {
+          console.error('浏览器定位失败:', error);
+          handleLocateError(error);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      showToast('您的浏览器不支持定位功能');
+      isLocating = false;
+      resetLocateBtn();
+    }
+  }
+  
+  // 根据坐标判断城市
+  function detectCityByCoordinates(lat, lng) {
+    console.log('根据坐标判断城市:', lat, lng);
+    
+    // 特殊处理：广西百色/隆林区域
+    // 隆林县大致范围：纬度24.5-25.0，经度105.0-105.6
+    // 这个区域离兴义市很近，但行政上属于广西百色
+    if (lat >= 24.3 && lat <= 25.2 && lng >= 104.8 && lng <= 106.0) {
+      console.log('检测到广西百色/隆林区域坐标');
+      currentCity = { ...cityData['百色市'], name: '百色市' };
+      document.getElementById('city-name').textContent = '百色市';
+      console.log('✅ 根据坐标识别城市: 百色市（广西西部区域）');
+      showToast('📍 已定位到百色市');
+      updateAddressListForCity('百色市');
+      
+      if (map && currentCity.lng && currentCity.lat) {
+        map.setCenter([currentCity.lng, currentCity.lat]);
+        map.setZoom(12);
+      }
+      
+      isLocating = false;
+      resetLocateBtn();
+      return true;
+    }
+    
+    // 计算与各个城市中心的距离，找出最近的城市
+    let nearestCity = null;
+    let minDistance = Infinity;
+    
+    for (let name in cityData) {
+      const city = cityData[name];
+      const distance = calculateDistance(lng, lat, city.lng, city.lat);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestCity = name;
+      }
+    }
+    
+    console.log('最近城市:', nearestCity, '距离:', minDistance.toFixed(1) + 'km');
+    
+    // 如果距离小于150公里，认为是该城市（扩大范围以适应大城市）
+    if (nearestCity && minDistance < 150) {
+      currentCity = { ...cityData[nearestCity], name: nearestCity };
+      document.getElementById('city-name').textContent = nearestCity;
+      console.log('✅ 根据坐标识别城市:', nearestCity);
+      showToast('📍 已定位到' + nearestCity);
+      updateAddressListForCity(nearestCity);
+      
+      // 更新地图中心
+      if (map && currentCity.lng && currentCity.lat) {
+        map.setCenter([currentCity.lng, currentCity.lat]);
+        map.setZoom(12);
+      }
+      
+      // 重置定位状态
+      isLocating = false;
+      resetLocateBtn();
+      return true;
+    }
+    
+    console.log('❌ 坐标超出所有城市范围');
+    return false;
+  }
+
+  // 高德定位成功回调
+  function onLocateSuccess(result) {
+    console.log('定位成功详情:', result);
+    const lng = result.position.lng;
+    const lat = result.position.lat;
+    
+    // 处理地址信息
+    let address = '当前位置';
+    let cityName = '';
+    let adcode = '';
+    
+    // 优先从addressComponent获取城市信息
+    if (result.addressComponent) {
+      const ac = result.addressComponent;
+      // 优先使用adcode精确匹配城市
+      adcode = ac.adcode || '';
+      // 使用区县所属的城市（更精确）
+      cityName = ac.city || ac.province || '';
+      const district = ac.district || '';
+      address = `${ac.province || ''}${ac.city || ''}${district}${ac.street || ''}${ac.streetNumber || ''}`;
+      
+      // 特殊处理：如果是隆林县，强制设置为百色市
+      if (district.includes('隆林') || address.includes('隆林')) {
+        console.log('检测到隆林县，强制匹配百色市');
+        cityName = '百色市';
+        // 如果adcode是县级，转换为市级
+        if (adcode && adcode.startsWith('451')) {
+          adcode = '451000'; // 百色市adcode
+        }
+      }
+      
+      console.log('地址组件:', ac, 'adcode:', adcode, 'cityName:', cityName);
+    } else if (result.formattedAddress) {
+      address = result.formattedAddress;
+      // 尝试从地址中提取城市
+      for (let name in cityData) {
+        const cityShort = name.replace(/市$/, '');
+        if (address.includes(cityShort)) {
+          cityName = name;
+          break;
+        }
+      }
+    }
+    
+    console.log('解析后的地址:', address, '坐标:', lng, lat, '识别城市:', cityName, 'adcode:', adcode);
+    
+    // 自动识别城市（优先使用adcode，其次是名称，后备使用坐标）
+    detectAndSetCity(cityName || '未知', lat, lng, adcode);
+    
+    setLocationResult(address, lat, lng);
+    
+    // 在地图上标记当前位置
+    if (map) {
+      map.setCenter([lng, lat]);
+      addCurrentMarker(lng, lat);
+    }
+  }
+  
+  // 通过adcode查找城市
+  function findCityByAdcode(adcode) {
+    if (!adcode) return null;
+    const adcodeStr = String(adcode); // 确保是字符串
+    console.log('查找adcode:', adcodeStr);
+    
+    // 首先尝试直接匹配
+    for (let name in cityData) {
+      if (cityData[name].adcode === adcodeStr) {
+        console.log('✅ 直接匹配城市:', name);
+        return name;
+      }
+    }
+    
+    // 匹配前4位（市级编码）
+    const cityCode = adcodeStr.substring(0, 4) + '00';
+    console.log('尝试市级编码匹配:', cityCode);
+    
+    for (let name in cityData) {
+      if (cityData[name].adcode === cityCode) {
+        console.log('✅ 市级编码匹配城市:', name);
+        return name;
+      }
+    }
+    
+    // 广西特殊处理：县级编码45xxxx属于广西
+    if (adcodeStr.startsWith('45')) {
+      console.log('检测到广西编码，尝试匹配广西城市...');
+      // 如果是隆林县(451031)或百色周边县，返回百色市
+      if (adcodeStr.startsWith('451') || adcodeStr.startsWith('452')) {
+        console.log('✅ 匹配到百色市（广西西部）');
+        return '百色市';
+      }
+      // 南宁周边
+      if (adcodeStr.startsWith('4501') || adcodeStr.startsWith('4502')) {
+        return '南宁市';
+      }
+    }
+    
+    console.log('❌ 未找到匹配城市');
+    return null;
+  }
+
+  // 检测并设置当前城市
+  function detectAndSetCity(cityName, lat, lng, adcode) {
+    console.log('尝试识别城市:', cityName, 'adcode:', adcode);
+    
+    // 优先使用adcode精确匹配
+    if (adcode) {
+      const matchedByAdcode = findCityByAdcode(adcode);
+      if (matchedByAdcode) {
+        console.log('✅ 通过adcode识别城市:', matchedByAdcode);
+        currentCity = { ...cityData[matchedByAdcode], name: matchedByAdcode };
+        document.getElementById('city-name').textContent = matchedByAdcode;
+        showToast('📍 已定位到' + matchedByAdcode);
+        updateAddressListForCity(matchedByAdcode);
+        if (map) {
+          map.setCenter([currentCity.lng, currentCity.lat]);
+          map.setZoom(12);
+        }
+        return;
+      }
+    }
+    
+    // 标准化城市名称（去掉"市"后缀）
+    const normalizedInput = cityName.replace(/市$/, '').trim();
+    let matchedCity = null;
+    
+    // 在城市数据中查找匹配的城市
+    for (let name in cityData) {
+      const normalizedCity = name.replace(/市$/, '').trim();
+      
+      // 完全匹配或包含关系
+      if (normalizedInput === normalizedCity || 
+          normalizedInput.includes(normalizedCity) || 
+          normalizedCity.includes(normalizedInput)) {
+        matchedCity = name;
+        break;
+      }
+    }
+    
+    // 如果没找到，尝试坐标匹配作为后备
+    if (!matchedCity && lat && lng) {
+      console.log('名称匹配失败，尝试坐标匹配...');
+      const found = detectCityByCoordinates(lat, lng);
+      if (!found) {
+        // 坐标匹配也失败，重置状态
+        isLocating = false;
+        resetLocateBtn();
+      }
+      return;
+    }
+    
+    if (matchedCity) {
+      currentCity = { ...cityData[matchedCity], name: matchedCity };
+      document.getElementById('city-name').textContent = matchedCity;
+      console.log('✅ 自动识别城市:', matchedCity);
+      showToast('📍 已定位到' + matchedCity);
+      
+      // 更新地址列表
+      updateAddressListForCity(matchedCity);
+      
+      // 更新地图中心
+      if (map && currentCity.lng && currentCity.lat) {
+        map.setCenter([currentCity.lng, currentCity.lat]);
+        map.setZoom(12);
+      }
+    } else {
+      console.log('❌ 未能识别城市:', cityName);
+      showToast('⚠️ 未能识别当前城市，请手动选择');
+    }
+    
+    // 重置定位状态
+    isLocating = false;
+    resetLocateBtn();
+  }
+
+  // 高德逆地理编码
+  function regeoCode(lng, lat) {
+    if (typeof AMap === 'undefined') {
+      // 尝试用坐标判断城市
+      detectCityByCoordinates(lat, lng);
+      setLocationResult('当前位置', lat, lng);
+      return;
+    }
+    
+    console.log('开始逆地理编码:', lng, lat);
+    
+    // 使用 Promise + 错误处理确保 Geocoder 加载
+    new Promise((resolve, reject) => {
+      if (typeof AMap.Geocoder === 'undefined') {
+        AMap.plugin('AMap.Geocoder', function() {
+          if (typeof AMap.Geocoder !== 'undefined') {
+            resolve();
+          } else {
+            reject(new Error('Geocoder插件加载失败'));
+          }
+        });
+      } else {
+        resolve();
+      }
+    }).then(() => {
+      const geocoder = new AMap.Geocoder({
+        radius: 1000,
+        extensions: 'all'
+      });
+      
+      geocoder.getAddress([lng, lat], function(status, result) {
+        console.log('逆地理编码结果:', status, result);
+        if (status === 'complete' && result.regeocode) {
+          const address = result.regeocode.formattedAddress;
+          const ac = result.regeocode.addressComponent;
+          
+          // 从逆地理编码结果中识别城市（优先使用adcode）
+          if (ac) {
+            let cityName = ac.city || ac.province || '';
+            const adcode = ac.adcode || '';
+            const district = ac.district || '';
+            
+            console.log('逆地理编码识别:', 'city:', cityName, 'district:', district, 'adcode:', adcode);
+            
+            // 特殊处理：如果是隆林县，强制设置为百色市
+            if (district.includes('隆林') || address.includes('隆林')) {
+              console.log('检测到隆林县，强制匹配百色市');
+              cityName = '百色市';
+            }
+            
+            detectAndSetCity(cityName, lat, lng, adcode);
+          }
+          
+          setLocationResult(address, lat, lng);
+          
+          if (map) {
+            map.setCenter([lng, lat]);
+            addCurrentMarker(lng, lat);
+          }
+        } else {
+          // 逆地理编码失败，详细记录错误
+          console.error('逆地理编码失败:', status, result);
+          // 尝试坐标判断
+          const found = detectCityByCoordinates(lat, lng);
+          if (!found) {
+            setLocationResult('当前位置', lat, lng);
+            showToast('⚠️ 定位成功但无法识别城市');
+            isLocating = false;
+            resetLocateBtn();
+          }
+        }
+      });
+    }).catch(err => {
+      console.error('Geocoder插件加载失败:', err);
+      detectCityByCoordinates(lat, lng);
+      setLocationResult('当前位置', lat, lng);
+    });
+  }
+
+  // 添加当前位置标记
+  function addCurrentMarker(lng, lat) {
+    if (currentMarker) {
+      map.remove(currentMarker);
+    }
+    
+    currentMarker = new AMap.Marker({
+      position: [lng, lat],
+      icon: new AMap.Icon({
+        size: new AMap.Size(30, 30),
+        image: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="%2300b36b" stroke="white" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="white"/></svg>',
+        imageSize: new AMap.Size(30, 30)
+      }),
+      offset: new AMap.Pixel(-15, -15)
+    });
+    
+    map.add(currentMarker);
+  }
+
+  // 定位失败处理
+  function onLocateError(result) {
+    console.error('定位失败详情:', result);
+    isLocating = false;
+    resetLocateBtn();
+    
+    // 高德定位失败，尝试浏览器原生定位
+    console.log('高德定位失败，尝试浏览器原生定位...');
+    useBrowserGeolocation();
+  }
+
+  // 处理定位错误
+  function handleLocateError(error) {
+    isLocating = false;
+    resetLocateBtn();
+    
+    let msg = '定位失败';
+    switch(error.code) {
+      case error.PERMISSION_DENIED:
+        msg = '请允许定位权限以获取准确位置';
+        break;
+      case error.POSITION_UNAVAILABLE:
+        msg = '位置信息不可用，请检查GPS';
+        break;
+      case error.TIMEOUT:
+        msg = '定位超时，尝试IP定位...';
+        // 尝试IP定位
+        useIPLocation();
+        break;
+    }
+    showToast(msg);
+    
+    const text = document.getElementById('loc-start');
+    text.textContent = '点击选择上车地点';
+    text.style.color = '';
+  }
+  
+  // IP定位（最后降级方案）
+  function useIPLocation() {
+    console.log('尝试IP定位...');
+    if (typeof AMap !== 'undefined') {
+      AMap.plugin('AMap.CitySearch', function() {
+        const citySearch = new AMap.CitySearch();
+        citySearch.getLocalCity(function(status, result) {
+          console.log('IP定位结果:', status, result);
+          if (status === 'complete' && result.city) {
+            const cityName = result.city;
+            console.log('IP定位到城市:', cityName);
+            
+            // 查找匹配的城市数据
+            let matchedCity = null;
+            for (let name in cityData) {
+              if (cityName.includes(name.replace('市', '')) || name.includes(cityName.replace('市', ''))) {
+                matchedCity = name;
+                break;
+              }
+            }
+            
+            if (matchedCity) {
+              currentCity = { ...cityData[matchedCity], name: matchedCity };
+              document.getElementById('city-name').textContent = matchedCity;
+              showToast('📍 IP定位到' + matchedCity);
+              updateAddressListForCity(matchedCity);
+              if (map) {
+                map.setCenter([currentCity.lng, currentCity.lat]);
+                map.setZoom(12);
+              }
+            } else {
+              showToast('💡 点击顶部城市名称可手动切换城市');
+            }
+          } else {
+            showToast('💡 点击顶部城市名称可手动切换城市');
+          }
+        });
+      });
+    } else {
+      showToast('💡 点击顶部城市名称可手动切换城市');
+    }
+  }
+
+  // 重置定位按钮
+  function resetLocateBtn() {
+    const btn = document.getElementById('loc-btn');
+    btn.classList.remove('locating');
+    btn.innerHTML = '📍 定位';
+  }
+
+  // 设置定位结果
+  function setLocationResult(address, lat, lng) {
+    isLocating = false;
+    selectedStart = address;
+    currentAddress = address;
+    if (lat) currentLat = lat;
+    if (lng) currentLng = lng;
+    
+    const btn = document.getElementById('loc-btn');
+    const text = document.getElementById('loc-start');
+    
+    btn.classList.remove('locating');
+    btn.innerHTML = '📍 重新定位';
+    text.textContent = address;
+    text.classList.remove('placeholder');
+    text.style.color = '';
+    
+    showToast('📍 已定位：' + address);
+  }
+
+  // 获取当前位置坐标
+  function getCurrentPosition() {
+    return { lat: currentLat, lng: currentLng, address: currentAddress };
+  }
+
+  function openAddressPage(target) {
+    addressTarget = target;
+    document.getElementById('addr-page-title').textContent = target === 'start' ? '选择上车地点' : '选择目的地';
+    document.getElementById('address-search-input').value = '';
+    switchPage('address');
+  }
+
+  function selectAddress(addr) {
+    if (addressTarget === 'start') {
+      selectedStart = addr;
+      const el = document.getElementById('loc-start');
+      el.textContent = addr;
+      el.classList.remove('placeholder');
+    } else {
+      selectedEnd = addr;
+      const el = document.getElementById('loc-end');
+      el.textContent = addr;
+      el.classList.remove('placeholder');
+    }
+    goBack();
+  }
+
+  // 所有可选地址列表
+  const allAddresses = [
+    // 贵阳市
+    { name: '贵阳北站', sub: '云岩区北京路与枣山路交叉口', icon: '🚄', dist: '3.2km' },
+    { name: '贵阳龙洞堡国际机场', sub: '南明区龙洞堡机场路', icon: '✈️', dist: '8.5km' },
+    { name: '贵州省人民医院', sub: '中华北路83号', icon: '🏥', dist: '1.8km' },
+    { name: '花溪公园', sub: '花溪区花溪公园路', icon: '🌿', dist: '4.6km' },
+    { name: '观山湖万达广场', sub: '观山湖区长岭北路', icon: '🛍', dist: '5.9km' },
+    { name: '贵州大学', sub: '花溪区贵州大学南路', icon: '🎓', dist: '6.1km' },
+    { name: '甲秀楼', sub: '南明区翠微巷8号', icon: '🏛️', dist: '2.3km' },
+    { name: '黔灵山公园', sub: '云岩区枣山路187号', icon: '⛰️', dist: '2.8km' },
+    { name: '贵阳火车站', sub: '南明区遵义路', icon: '🚂', dist: '1.5km' },
+    { name: '大十字', sub: '南明区中华南路', icon: '🏢', dist: '0.8km' },
+    { name: '喷水池', sub: '云岩区中华中路', icon: '⛲', dist: '1.2km' },
+    { name: '花果园', sub: '南明区花果园大街', icon: '🏘️', dist: '3.5km' },
+    { name: '贵阳国际金融中心', sub: '观山湖区长岭北路', icon: '🏢', dist: '5.5km' },
+    { name: '贵州省博物馆', sub: '观山湖区林城东路', icon: '🏛️', dist: '6.2km' },
+    { name: '青岩古镇', sub: '花溪区青岩镇', icon: '🏯', dist: '12.5km' },
+    { name: '天河潭', sub: '花溪区石板镇', icon: '🌊', dist: '15.3km' },
+    { name: '红枫湖', sub: '清镇市红枫湖镇', icon: '🌅', dist: '28.6km' },
+    { name: '南江大峡谷', sub: '开阳县南江乡', icon: '🏞️', dist: '45.2km' },
+    
+    // 遵义市
+    { name: '遵义会议会址', sub: '红花岗区老城红旗路', icon: '🏛️', dist: '142km' },
+    { name: '遵义新舟机场', sub: '新蒲新区新舟镇', icon: '✈️', dist: '155km' },
+    { name: '遵义茅台机场', sub: '仁怀市茅台镇', icon: '✈️', dist: '168km' },
+    { name: '遵义火车站', sub: '红花岗区北京路', icon: '🚂', dist: '140km' },
+    { name: '遵义医学院附属医院', sub: '汇川区大连路', icon: '🏥', dist: '143km' },
+    { name: '红军山烈士陵园', sub: '红花岗区凤凰南路', icon: '⛰️', dist: '141km' },
+    { name: '凤凰山国家森林公园', sub: '红花岗区凤凰南路', icon: '🌲', dist: '141km' },
+    { name: '遵义老城步行街', sub: '红花岗区老城', icon: '🛍', dist: '142km' },
+    { name: '仁怀市茅台镇', sub: '仁怀市茅台镇', icon: '🍶', dist: '168km' },
+    { name: '赤水丹霞', sub: '赤水市', icon: '🏞️', dist: '298km' },
+    
+    // 安顺市
+    { name: '安顺黄果树瀑布', sub: '镇宁县黄果树镇', icon: '🌊', dist: '128km' },
+    { name: '安顺龙宫', sub: '西秀区龙宫镇', icon: '🏞️', dist: '115km' },
+    { name: '安顺黄果树机场', sub: '西秀区双堡镇', icon: '✈️', dist: '108km' },
+    { name: '安顺火车站', sub: '西秀区中华南路', icon: '🚂', dist: '105km' },
+    { name: '安顺市人民医院', sub: '西秀区黄果树大街', icon: '🏥', dist: '106km' },
+    { name: '安顺虹山湖公园', sub: '西秀区虹山湖路', icon: '🌿', dist: '107km' },
+    { name: '安顺塔山广场', sub: '西秀区塔山西路', icon: '🏢', dist: '105km' },
+    { name: '紫云格凸河', sub: '紫云县格凸河镇', icon: '🏞️', dist: '158km' },
+    
+    // 毕节市
+    { name: '毕节飞雄机场', sub: '大方县响水乡', icon: '✈️', dist: '178km' },
+    { name: '毕节火车站', sub: '七星关区梨树镇', icon: '🚂', dist: '175km' },
+    { name: '毕节市第一人民医院', sub: '七星关区广惠路', icon: '🏥', dist: '176km' },
+    { name: '毕节百里杜鹃', sub: '大方县普底乡', icon: '🌸', dist: '165km' },
+    { name: '毕节织金洞', sub: '织金县官寨乡', icon: '⛰️', dist: '125km' },
+    { name: '毕节威宁草海', sub: '威宁县草海镇', icon: '🌊', dist: '268km' },
+    { name: '大方县奢香古镇', sub: '大方县', icon: '🏘️', dist: '168km' },
+    
+    // 铜仁市
+    { name: '铜仁凤凰机场', sub: '大兴镇', icon: '✈️', dist: '318km' },
+    { name: '铜仁火车站', sub: '碧江区清水大道', icon: '🚂', dist: '308km' },
+    { name: '铜仁市人民医院', sub: '碧江区川硐教育园区', icon: '🏥', dist: '309km' },
+    { name: '铜仁梵净山', sub: '江口县太平镇', icon: '⛰️', dist: '348km' },
+    { name: '铜仁中南门古城', sub: '碧江区中南门', icon: '🏛️', dist: '308km' },
+    { name: '铜仁大明边城', sub: '碧江区锦江大桥', icon: '🏯', dist: '310km' },
+    { name: '石阡温泉', sub: '石阡县汤山镇', icon: '♨️', dist: '285km' },
+    
+    // 凯里市（黔东南州）
+    { name: '凯里千户苗寨', sub: '雷山县西江镇', icon: '🏘️', dist: '188km' },
+    { name: '凯里黄平机场', sub: '黄平县东坡农场', icon: '✈️', dist: '165km' },
+    { name: '凯里火车站', sub: '凯里市清江路', icon: '🚂', dist: '185km' },
+    { name: '凯里南站', sub: '凯里市金汇大道', icon: '🚄', dist: '182km' },
+    { name: '凯里市第一人民医院', sub: '凯里市营盘西路', icon: '🏥', dist: '185km' },
+    { name: '凯里下司古镇', sub: '凯里市下司镇', icon: '🏛️', dist: '175km' },
+    { name: '凯里大十字', sub: '凯里市中心城区', icon: '🏢', dist: '185km' },
+    { name: '镇远古镇', sub: '镇远县舞阳镇', icon: '🏛️', dist: '228km' },
+    { name: '肇兴侗寨', sub: '黎平县肇兴镇', icon: '🏘️', dist: '298km' },
+    { name: '荔波小七孔', sub: '荔波县小七孔镇', icon: '🌊', dist: '258km' },
+    
+    // 都匀市（黔南州）
+    { name: '都匀影视城', sub: '都匀市毛尖大道', icon: '🎬', dist: '108km' },
+    { name: '都匀火车站', sub: '都匀市剑江北路', icon: '🚂', dist: '105km' },
+    { name: '都匀东站', sub: '都匀市大坪镇', icon: '🚄', dist: '98km' },
+    { name: '都匀市人民医院', sub: '都匀市文峰路', icon: '🏥', dist: '106km' },
+    { name: '都匀石板古街', sub: '都匀市广惠路', icon: '🛍', dist: '105km' },
+    { name: '都匀文峰公园', sub: '都匀市文峰路', icon: '🌿', dist: '106km' },
+    { name: '都匀斗篷山', sub: '都匀市毛尖镇', icon: '⛰️', dist: '118km' },
+    { name: '平塘天眼', sub: '平塘县克度镇', icon: '🔭', dist: '168km' },
+    
+    // 兴义市（黔西南州）
+    { name: '兴义万峰林', sub: '兴义市万峰林街道', icon: '⛰️', dist: '318km' },
+    { name: '兴义万峰湖', sub: '兴义市则戎镇', icon: '🌊', dist: '325km' },
+    { name: '兴义马岭河峡谷', sub: '兴义市马岭镇', icon: '🏞️', dist: '315km' },
+    { name: '兴义万峰林机场', sub: '兴义市桔山街道', icon: '✈️', dist: '312km' },
+    { name: '兴义火车站', sub: '兴义市顶效镇', icon: '🚂', dist: '308km' },
+    { name: '兴义市人民医院', sub: '兴义市园陵路', icon: '🏥', dist: '316km' },
+    { name: '兴义街心花园', sub: '兴义市向阳路', icon: '🌳', dist: '316km' },
+    { name: '兴义桔山广场', sub: '兴义市桔山大道', icon: '🏢', dist: '314km' },
+    { name: '兴义贵州醇景区', sub: '兴义市贵醇新路', icon: '🍷', dist: '318km' },
+    { name: '晴隆二十四道拐', sub: '晴隆县莲城镇', icon: '🛤️', dist: '268km' },
+    
+    // 六盘水市
+    { name: '六盘水月照机场', sub: '钟山区月照乡', icon: '✈️', dist: '258km' },
+    { name: '六盘水火车站', sub: '钟山区水西路', icon: '🚂', dist: '248km' },
+    { name: '六盘水市人民医院', sub: '钟山区钟山大道', icon: '🏥', dist: '250km' },
+    { name: '六盘水水城古镇', sub: '钟山区钟山大道', icon: '🏘️', dist: '248km' },
+    { name: '六盘水明湖湿地公园', sub: '钟山区明湖路', icon: '🌿', dist: '246km' },
+    { name: '六盘水梅花山', sub: '钟山区梅花山', icon: '⛰️', dist: '238km' },
+    { name: '六盘水乌蒙大草原', sub: '盘州市乌蒙镇', icon: '🌲', dist: '288km' },
+    { name: '六盘水韭菜坪', sub: '钟山区大湾镇', icon: '⛰️', dist: '265km' },
+    { name: '盘州市', sub: '盘州市红果街道', icon: '🏢', dist: '298km' },
+    
+    // 广西百色市
+    { name: '百色站', sub: '右江区站前大道', icon: '🚂', dist: '380km' },
+    { name: '百色学院', sub: '右江区中山二路', icon: '🎓', dist: '382km' },
+    { name: '百色市人民医院', sub: '右江区城乡路', icon: '🏥', dist: '381km' },
+    { name: '百色起义纪念馆', sub: '右江区城东路', icon: '🏛️', dist: '383km' },
+    { name: '百色高铁站', sub: '右江区迎龙路', icon: '🚄', dist: '379km' },
+    { name: '百色万达广场', sub: '右江区龙景西路', icon: '🛍', dist: '384km' },
+    
+    // 广西百色市隆林县
+    { name: '隆林汽车站', sub: '新州镇民权街', icon: '🚌', dist: '420km' },
+    { name: '隆林县政府', sub: '新州镇民权街200号', icon: '🏢', dist: '421km' },
+    { name: '隆林县人民医院', sub: '新州镇民生街', icon: '🏥', dist: '420km' },
+    { name: '隆林民族中学', sub: '新州镇民族路', icon: '🎓', dist: '422km' },
+    { name: '隆林中心广场', sub: '新州镇民权街', icon: '⛲', dist: '421km' },
+    { name: '隆林天生桥', sub: '天生桥镇', icon: '🌉', dist: '435km' },
+    { name: '隆林德峨镇', sub: '德峨镇', icon: '🏘️', dist: '445km' },
+    { name: '隆林桠杈镇', sub: '桠杈镇', icon: '🏘️', dist: '458km' }
+  ];
+
+  function filterAddress(val) {
+    const listContainer = document.getElementById('address-list');
+    
+    if (!val || val.trim() === '') {
+      // 显示当前城市的默认列表
+      const cityAddresses = generateCityAddresses(currentCity.name || '贵阳市');
+      renderAddressList(cityAddresses.slice(0, 12));
+      return;
+    }
+    
+    // 搜索匹配 - 包括全国地点数据
+    const keyword = val.toLowerCase().trim();
+    
+    // 先搜索当前城市的地点
+    let matched = allAddresses.filter(addr => {
+      return addr.name.toLowerCase().includes(keyword) || 
+             addr.sub.toLowerCase().includes(keyword) ||
+             addr.name.includes(val);
+    });
+    
+    // 如果当前城市有特定地点，也搜索
+    const citySpecific = getCitySpecificPlaces(currentCity.name || '贵阳市');
+    const matchedCitySpecific = citySpecific.filter(addr => {
+      return addr.name.toLowerCase().includes(keyword) || 
+             addr.sub.toLowerCase().includes(keyword) ||
+             addr.name.includes(val);
+    });
+    
+    // 合并结果
+    matched = [...matchedCitySpecific, ...matched];
+    
+    // 去重
+    const seen = new Set();
+    matched = matched.filter(addr => {
+      if (seen.has(addr.name)) return false;
+      seen.add(addr.name);
+      return true;
+    });
+    
+    if (matched.length === 0) {
+      // 没有匹配结果，显示智能提示
+      listContainer.innerHTML = `
+        <div class="address-section-label">搜索结果</div>
+        <div style="padding: 40px 20px; text-align: center; color: var(--text-gray);">
+          <div style="font-size: 40px; margin-bottom: 10px;">🔍</div>
+          <div>未找到"${val}"相关地点</div>
+          <div style="font-size: 12px; margin-top: 8px;">试试搜索：${currentCity.name ? currentCity.name.replace('市', '') : '贵阳'}北站、机场、医院</div>
+        </div>
+      `;
+    } else {
+      renderAddressList(matched);
+    }
+  }
+
+  function renderAddressList(addresses) {
+    const listContainer = document.getElementById('address-list');
+    const html = addresses.map(addr => `
+      <div class="address-item" onclick="selectAddress('${addr.name}')">
+        <div class="address-item-icon">${addr.icon}</div>
+        <div class="address-item-info">
+          <div class="address-item-name">${addr.name}</div>
+          <div class="address-item-sub">${addr.sub}</div>
+        </div>
+        <div class="address-item-dist">${addr.dist}</div>
+      </div>
+    `).join('');
+    
+    listContainer.innerHTML = '<div class="address-section-label">附近地点</div>' + html;
+  }
+
+  function goToConfirm() {
+    if (!selectedEnd) {
+      showToast('请先选择目的地');
+      return;
+    }
+    const start = selectedStart || '当前位置（贵阳市南明区）';
+    const end = selectedEnd;
+    document.getElementById('confirm-start').textContent = start.length > 10 ? start.slice(0,10)+'…' : start;
+    document.getElementById('confirm-end').textContent = end.length > 10 ? end.slice(0,10)+'…' : end;
+    
+    // 计算实际距离和时间
+    const startCoord = addressCoords[start] || { lng: currentLng || 106.71, lat: currentLat || 26.57 };
+    const endCoord = addressCoords[end] || { lng: 106.70, lat: 26.61 };
+    const distance = calculateDistance(startCoord.lng, startCoord.lat, endCoord.lng, endCoord.lat);
+    const estimatedTime = Math.round(distance / 0.5);
+    
+    // 更新路线信息显示
+    document.getElementById('route-distance').textContent = distance.toFixed(1) + 'km';
+    document.getElementById('route-time').textContent = estimatedTime + '分钟';
+    
+    // 更新各车型价格
+    updateCarTypePrices(distance);
+    
+    switchPage('confirm');
+  }
+
+  // 当前出行类型
+  let currentTripType = '快车';
+
+  // 根据距离更新各车型价格
+  function updateCarTypePrices(distance) {
+    let prices = {};
+    
+    if (currentTripType === '顺风车') {
+      // 顺风车：按座位拼车计价，价格更低
+      // 计算单人座位价格（约快车的4-5折）
+      const basePrice = Math.round(5 + distance * 1.2); // 起步低，每公里便宜
+      prices = {
+        'jj': basePrice,        // 经济座：1人座
+        'sc': Math.round(basePrice * 1.5),  // 舒适座：1人座（稍宽敞）
+        'hh': Math.round(basePrice * 2),    // 豪华座：1人座
+        'sw': Math.round(basePrice * 1.3)   // 商务座：可拼2-3人
+      };
+    } else {
+      // 快车：专车服务，价格较高
+      prices = {
+        'jj': Math.round(10 + distance * 2.5),   // 经济快车
+        'sc': Math.round(15 + distance * 3.5),  // 舒适型
+        'hh': Math.round(25 + distance * 5),    // 豪华型
+        'sw': Math.round(12 + distance * 2.8)   // 商务型
+      };
+    }
+    
+    // 更新显示的价格
+    const priceElements = document.querySelectorAll('.car-type-item .price span');
+    if (priceElements.length >= 4) {
+      priceElements[0].textContent = prices['jj'];
+      priceElements[1].textContent = prices['sc'];
+      priceElements[2].textContent = prices['hh'];
+      priceElements[3].textContent = prices['sw'];
+    }
+    
+    // 更新选中的价格
+    const selectedItem = document.querySelector('.car-type-item.selected');
+    if (selectedItem) {
+      const priceEl = selectedItem.querySelector('.price span');
+      if (priceEl) {
+        document.getElementById('confirm-price').textContent = priceEl.textContent;
+      }
+    } else {
+      document.getElementById('confirm-price').textContent = prices['jj'];
+    }
+  }
+
+  // ===== 确认订单 =====
+  let allCarItems = null;
+  function selectCarType(el, price) {
+    if (!allCarItems) allCarItems = document.querySelectorAll('.car-type-item');
+    allCarItems.forEach(item => {
+      item.classList.remove('selected');
+      item.querySelector('.car-type-radio').classList.remove('checked');
+    });
+    el.classList.add('selected');
+    el.querySelector('.car-type-radio').classList.add('checked');
+    selectedPrice = price;
+    document.getElementById('confirm-price').textContent = price;
+  }
+
+  function toggleNote(el) {
+    el.style.borderColor = el.style.borderColor === 'var(--primary)' ? 'var(--border)' : 'var(--primary)';
+    el.style.color = el.style.color === 'var(--primary)' ? 'var(--text-gray)' : 'var(--primary)';
+    el.style.background = el.style.background === 'var(--primary-light)' ? '' : 'var(--primary-light)';
+  }
+
+  // 地址坐标库（用于计算距离）
+  const addressCoords = {
+    // 贵阳市
+    '贵阳北站': { lng: 106.700, lat: 26.610 },
+    '贵阳龙洞堡国际机场': { lng: 106.800, lat: 26.540 },
+    '贵州省人民医院': { lng: 106.720, lat: 26.580 },
+    '花溪公园': { lng: 106.670, lat: 26.440 },
+    '观山湖万达广场': { lng: 106.620, lat: 26.650 },
+    '贵州大学': { lng: 106.680, lat: 26.450 },
+    '甲秀楼': { lng: 106.720, lat: 26.570 },
+    '黔灵山公园': { lng: 106.690, lat: 26.590 },
+    '贵阳国际金融中心': { lng: 106.630, lat: 26.650 },
+    '贵州省贵阳市南明区花溪大道': { lng: 106.710, lat: 26.570 },
+    '贵州省贵阳市观山湖区': { lng: 106.630, lat: 26.650 },
+    '贵阳火车站': { lng: 106.710, lat: 26.550 },
+    '大十字': { lng: 106.720, lat: 26.580 },
+    '喷水池': { lng: 106.710, lat: 26.590 },
+    '花果园': { lng: 106.690, lat: 26.560 },
+    '贵州省博物馆': { lng: 106.640, lat: 26.660 },
+    '青岩古镇': { lng: 106.600, lat: 26.340 },
+    '天河潭': { lng: 106.580, lat: 26.420 },
+    '红枫湖': { lng: 106.450, lat: 26.550 },
+    '南江大峡谷': { lng: 106.950, lat: 27.050 },
+    
+    // 遵义市
+    '遵义会议会址': { lng: 106.930, lat: 27.690 },
+    '遵义新舟机场': { lng: 107.250, lat: 27.800 },
+    '遵义茅台机场': { lng: 106.330, lat: 27.950 },
+    '遵义火车站': { lng: 106.920, lat: 27.700 },
+    '遵义医学院附属医院': { lng: 106.940, lat: 27.710 },
+    '红军山烈士陵园': { lng: 106.910, lat: 27.680 },
+    '凤凰山国家森林公园': { lng: 106.900, lat: 27.670 },
+    '遵义老城步行街': { lng: 106.920, lat: 27.690 },
+    '汇川区人民路': { lng: 106.930, lat: 27.720 },
+    '新蒲新区': { lng: 107.050, lat: 27.750 },
+    '仁怀市茅台镇': { lng: 106.370, lat: 27.810 },
+    '赤水丹霞': { lng: 105.700, lat: 28.550 },
+    
+    // 安顺市
+    '安顺黄果树瀑布': { lng: 105.670, lat: 25.990 },
+    '安顺龙宫': { lng: 105.880, lat: 26.120 },
+    '安顺黄果树机场': { lng: 105.870, lat: 26.260 },
+    '安顺火车站': { lng: 105.930, lat: 26.250 },
+    '安顺市人民医院': { lng: 105.950, lat: 26.250 },
+    '安顺虹山湖公园': { lng: 105.920, lat: 26.260 },
+    '安顺塔山广场': { lng: 105.930, lat: 26.240 },
+    '安顺西秀区': { lng: 105.940, lat: 26.250 },
+    '平坝区': { lng: 106.260, lat: 26.410 },
+    '紫云格凸河': { lng: 106.080, lat: 25.750 },
+    
+    // 毕节市
+    '毕节飞雄机场': { lng: 105.500, lat: 27.270 },
+    '毕节火车站': { lng: 105.280, lat: 27.300 },
+    '毕节市第一人民医院': { lng: 105.300, lat: 27.300 },
+    '毕节百里杜鹃': { lng: 105.850, lat: 27.150 },
+    '毕节织金洞': { lng: 105.880, lat: 26.780 },
+    '毕节威宁草海': { lng: 104.280, lat: 26.850 },
+    '毕节七星关区': { lng: 105.290, lat: 27.300 },
+    '大方县奢香古镇': { lng: 105.600, lat: 27.150 },
+    
+    // 铜仁市
+    '铜仁凤凰机场': { lng: 109.310, lat: 27.880 },
+    '铜仁火车站': { lng: 109.190, lat: 27.730 },
+    '铜仁市人民医院': { lng: 109.200, lat: 27.730 },
+    '铜仁梵净山': { lng: 108.770, lat: 27.910 },
+    '铜仁中南门古城': { lng: 109.180, lat: 27.720 },
+    '铜仁碧江区': { lng: 109.190, lat: 27.730 },
+    '铜仁万山区': { lng: 109.210, lat: 27.520 },
+    '铜仁大明边城': { lng: 109.220, lat: 27.740 },
+    '石阡温泉': { lng: 108.230, lat: 27.520 },
+    
+    // 凯里市（黔东南州）
+    '凯里千户苗寨': { lng: 108.170, lat: 26.500 },
+    '凯里黄平机场': { lng: 107.980, lat: 26.970 },
+    '凯里火车站': { lng: 107.980, lat: 26.590 },
+    '凯里南站': { lng: 107.900, lat: 26.530 },
+    '凯里市第一人民医院': { lng: 107.980, lat: 26.590 },
+    '凯里下司古镇': { lng: 107.950, lat: 26.550 },
+    '凯里大十字': { lng: 107.980, lat: 26.590 },
+    '镇远古镇': { lng: 108.430, lat: 27.050 },
+    '肇兴侗寨': { lng: 109.170, lat: 25.910 },
+    '荔波小七孔': { lng: 107.880, lat: 25.420 },
+    
+    // 都匀市（黔南州）
+    '都匀影视城': { lng: 107.520, lat: 26.260 },
+    '都匀火车站': { lng: 107.520, lat: 26.260 },
+    '都匀东站': { lng: 107.600, lat: 26.320 },
+    '都匀市人民医院': { lng: 107.520, lat: 26.260 },
+    '都匀石板古街': { lng: 107.510, lat: 26.260 },
+    '都匀文峰公园': { lng: 107.530, lat: 26.260 },
+    '都匀斗篷山': { lng: 107.350, lat: 26.350 },
+    '平塘天眼': { lng: 106.860, lat: 25.650 },
+    
+    // 兴义市（黔西南州）
+    '兴义万峰林': { lng: 104.900, lat: 24.980 },
+    '兴义万峰湖': { lng: 104.950, lat: 24.950 },
+    '兴义马岭河峡谷': { lng: 104.950, lat: 25.100 },
+    '兴义万峰林机场': { lng: 104.960, lat: 25.090 },
+    '兴义火车站': { lng: 104.900, lat: 25.080 },
+    '兴义市人民医院': { lng: 104.900, lat: 25.090 },
+    '兴义街心花园': { lng: 104.900, lat: 25.090 },
+    '兴义桔山广场': { lng: 104.920, lat: 25.100 },
+    '兴义贵州醇景区': { lng: 104.930, lat: 25.080 },
+    '晴隆二十四道拐': { lng: 105.220, lat: 25.850 },
+    
+    // 六盘水市
+    '六盘水月照机场': { lng: 104.970, lat: 26.610 },
+    '六盘水火车站': { lng: 104.830, lat: 26.590 },
+    '六盘水市人民医院': { lng: 104.840, lat: 26.590 },
+    '六盘水钟山区': { lng: 104.830, lat: 26.590 },
+    '六盘水水城古镇': { lng: 104.820, lat: 26.590 },
+    '六盘水明湖湿地公园': { lng: 104.820, lat: 26.570 },
+    '六盘水梅花山': { lng: 104.780, lat: 26.650 },
+    '六盘水乌蒙大草原': { lng: 104.680, lat: 26.080 },
+    '六盘水韭菜坪': { lng: 104.650, lat: 26.880 },
+    '盘州市': { lng: 104.470, lat: 25.710 },
+    
+    // 广西百色市
+    '百色站': { lng: 106.620, lat: 23.900 },
+    '百色学院': { lng: 106.630, lat: 23.910 },
+    '百色市人民医院': { lng: 106.610, lat: 23.900 },
+    '百色起义纪念馆': { lng: 106.620, lat: 23.900 },
+    '百色高铁站': { lng: 106.650, lat: 23.890 },
+    '百色万达广场': { lng: 106.640, lat: 23.910 },
+    
+    // 广西百色市隆林县
+    '隆林汽车站': { lng: 105.340, lat: 24.770 },
+    '隆林县政府': { lng: 105.350, lat: 24.770 },
+    '隆林县人民医院': { lng: 105.340, lat: 24.760 },
+    '隆林民族中学': { lng: 105.350, lat: 24.780 },
+    '隆林中心广场': { lng: 105.340, lat: 24.770 },
+    '隆林天生桥': { lng: 105.280, lat: 24.850 },
+    '隆林德峨镇': { lng: 105.180, lat: 24.650 },
+    '隆林桠杈镇': { lng: 105.420, lat: 24.920 }
+  };
+
+  // 计算两点间距离（公里）
+  function calculateDistance(lng1, lat1, lng2, lat2) {
+    const R = 6371; // 地球半径（公里）
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  // 根据距离计算费用
+  function calculatePrice(distance, carType) {
+    let type = 'jj';
+    if (document.querySelector('.car-type-item.selected')) {
+      const selectedRadio = document.querySelector('.car-type-item.selected .car-type-radio');
+      if (selectedRadio) {
+        if (selectedRadio.id === 'radio-sc') type = 'sc';
+        else if (selectedRadio.id === 'radio-hh') type = 'hh';
+        else if (selectedRadio.id === 'radio-sw') type = 'sw';
+      }
+    }
+    
+    if (currentTripType === '顺风车') {
+      // 顺风车：拼车计价，价格更低
+      const basePrice = Math.round(5 + distance * 1.2);
+      const multipliers = { 'jj': 1, 'sc': 1.5, 'hh': 2, 'sw': 1.3 };
+      return Math.round(basePrice * multipliers[type]);
+    } else {
+      // 快车：专车计价
+      const basePrice = { 'jj': 10, 'sc': 15, 'hh': 25, 'sw': 12 };
+      const perKm = { 'jj': 2.5, 'sc': 3.5, 'hh': 5, 'sw': 2.8 };
+      return Math.round(basePrice[type] + (distance * perKm[type]));
+    }
+  }
+
+  function placeOrder() {
+    orderPlaced = true;
+    const start = selectedStart || '贵阳市南明区花溪大道';
+    const end = selectedEnd || '贵阳北站';
+    
+    // 获取起点和终点的坐标
+    const startCoord = addressCoords[start] || { lng: currentLng || 106.71, lat: currentLat || 26.57 };
+    const endCoord = addressCoords[end] || { lng: 106.70, lat: 26.61 };
+    
+    // 计算实际距离
+    const distance = calculateDistance(startCoord.lng, startCoord.lat, endCoord.lng, endCoord.lat);
+    const estimatedTime = Math.round(distance / 0.5); // 假设平均时速30km/h = 0.5km/min
+    
+    // 根据距离重新计算价格
+    const newPrice = calculatePrice(distance);
+    selectedPrice = newPrice;
+    
+    // 更新显示
+    document.getElementById('detail-start').textContent = start;
+    document.getElementById('detail-end').textContent = end;
+    document.getElementById('ongoing-start').textContent = start;
+    document.getElementById('ongoing-end').textContent = end;
+    document.getElementById('order-badge').style.display = 'block';
+    
+    // 更新确认页面的价格和距离信息
+    document.getElementById('confirm-price').textContent = newPrice;
+    
+    // 在地图上规划路线
+    if (map && typeof AMap !== 'undefined') {
+      addRouteMarkers(startCoord.lng, startCoord.lat, endCoord.lng, endCoord.lat);
+      planRoute(startCoord.lng, startCoord.lat, endCoord.lng, endCoord.lat);
+    }
+    
+    // 更新地图上的位置信息
+    updateMapLocationInfo();
+    
+    showToast(`距离约${distance.toFixed(1)}公里，预计${estimatedTime}分钟，费用¥${newPrice}`);
+    
+    switchPage('calling');
+    startTripSimulation();
+  }
+
+  // ===== 行程模拟 =====
+  function startTripSimulation() {
+    currentTripStep = 0;
+    clearTimeout(tripSimTimer);
+    updateTripUI(0);
+
+    // 3秒后匹配成功
+    tripSimTimer = setTimeout(() => {
+      updateTripUI(1);
+      // 15秒后司机到达
+      tripSimTimer = setTimeout(() => {
+        updateTripUI(2);
+        // 20秒后行程结束
+        tripSimTimer = setTimeout(() => {
+          updateTripUI(3);
+        }, 20000);
+      }, 15000);
+    }, 3000);
+  }
+
+  function updateTripUI(step) {
+    currentTripStep = step;
+    const spinner = document.getElementById('calling-spinner');
+    const title = document.getElementById('calling-title');
+    const sub = document.getElementById('calling-sub');
+    const driverInfo = document.getElementById('driver-info');
+    const tripProgress = document.getElementById('trip-progress');
+    const tripDetails = document.getElementById('trip-details');
+    const progressFill = document.getElementById('progress-fill');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const navTitle = document.getElementById('calling-nav-title');
+
+    if (step === 0) {
+      // 匹配中
+      spinner.style.display = 'block';
+      title.textContent = '正在为您匹配司机...';
+      sub.textContent = '已有3位司机抢单中';
+      driverInfo.style.display = 'none';
+      tripProgress.style.display = 'none';
+      tripDetails.style.display = 'none';
+    } else if (step === 1) {
+      // 匹配成功，司机前来
+      spinner.style.display = 'none';
+      title.textContent = '司机正在赶来';
+      sub.textContent = '预计2分钟后到达上车点';
+      driverInfo.style.display = 'flex';
+      tripProgress.style.display = 'block';
+      tripDetails.style.display = 'block';
+      progressFill.style.width = '35%';
+      navTitle.textContent = '司机正在前往';
+      // 在地图上添加车辆标记
+      addCarMarker();
+    } else if (step === 2) {
+      // 行程中
+      title.textContent = '行程进行中';
+      sub.textContent = '预计22:28到达目的地';
+      progressFill.style.width = '65%';
+      navTitle.textContent = '行程进行中';
+      document.getElementById('step3').classList.add('current');
+      document.getElementById('step2').classList.remove('current');
+      document.getElementById('step2').classList.add('done');
+      document.getElementById('trip-eta-label').textContent = '预计到达';
+      document.getElementById('trip-eta').textContent = '约8分钟后';
+      cancelBtn.textContent = '紧急求助';
+      cancelBtn.style.borderColor = '#ff4444';
+      cancelBtn.style.color = '#ff4444';
+    } else if (step === 3) {
+      // 到达
+      progressFill.style.width = '100%';
+      navTitle.textContent = '行程已结束';
+      title.textContent = '🎉 已安全到达目的地';
+      sub.textContent = `本次行程费用：¥${selectedPrice}`;
+      document.getElementById('step4').classList.add('done');
+      document.getElementById('step3').classList.remove('current');
+      document.getElementById('step3').classList.add('done');
+      document.getElementById('trip-eta').textContent = '已到达';
+      cancelBtn.style.display = 'none';
+      document.getElementById('order-badge').style.display = 'none';
+      // 添加支付按钮
+      const payBtnWrap = document.createElement('div');
+      payBtnWrap.style.cssText = 'display:flex;gap:10px;margin-top:12px;';
+      payBtnWrap.innerHTML = `
+        <button style="flex:1;padding:13px;background:var(--primary);color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;" onclick="finishTrip()">
+          💚 微信支付 ¥${selectedPrice}
+        </button>
+      `;
+      cancelBtn.parentNode.insertBefore(payBtnWrap, cancelBtn);
+    }
+  }
+
+  // 在地图上添加车辆标记
+  function addCarMarker() {
+    if (!map || !currentLng || !currentLat) return;
+    
+    // 模拟车辆位置（稍微偏移）
+    const carLng = currentLng + 0.002;
+    const carLat = currentLat + 0.001;
+    
+    if (carMarker) map.remove(carMarker);
+    
+    carMarker = new AMap.Marker({
+      position: [carLng, carLat],
+      icon: new AMap.Icon({
+        size: new AMap.Size(40, 40),
+        image: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="%2300b36b" stroke="white" stroke-width="3"/><text x="20" y="26" text-anchor="middle" font-size="20">🚗</text></svg>',
+        imageSize: new AMap.Size(40, 40)
+      }),
+      offset: new AMap.Pixel(-20, -20),
+      autoRotation: true
+    });
+    
+    map.add(carMarker);
+    
+    // 模拟车辆移动
+    animateCarOnMap(carLng, carLat, currentLng, currentLat);
+  }
+
+  // 在地图上动画移动车辆
+  function animateCarOnMap(fromLng, fromLat, toLng, toLat) {
+    if (!carMarker) return;
+    
+    let progress = 0;
+    const duration = 15000; // 15秒
+    const startTime = Date.now();
+    
+    function move() {
+      const elapsed = Date.now() - startTime;
+      progress = Math.min(elapsed / duration, 1);
+      
+      const lng = fromLng + (toLng - fromLng) * progress;
+      const lat = fromLat + (toLat - fromLat) * progress;
+      
+      carMarker.setPosition([lng, lat]);
+      
+      if (progress < 1) {
+        requestAnimationFrame(move);
+      }
+    }
+    
+    move();
+  }
+
+  function cancelTrip() {
+    if (currentTripStep >= 2) {
+      showToast('紧急联系客服：400-888-9999');
+      return;
+    }
+    clearTimeout(tripSimTimer);
+    showToast('行程已取消');
+    document.getElementById('order-badge').style.display = 'none';
+    orderPlaced = false;
+    setTimeout(() => switchTab('home'), 1000);
+  }
+
+  function finishTrip() {
+    showToast('支付成功！感谢您的乘坐');
+    setTimeout(() => {
+      showRateModal();
+    }, 1000);
+  }
+
+  // ===== 拖动地图选点 =====
+  let pickMap = null;
+  let pickMapTarget = 'start'; // 'start' or 'end'
+  let pickMapCenter = { lng: 106.71, lat: 26.57 };
+  let pickMapGeocodeTimer = null;
+  let pickMapDragging = false;
+
+  function openPickMap(target) {
+    pickMapTarget = target || 'start';
+    const title = target === 'end' ? '拖动地图选择目的地' : '拖动地图选择上车地点';
+    document.getElementById('pick-map-title').textContent = title;
+
+    // 显示页面
+    switchPage('pick-map');
+
+    // 初始中心：当前定位坐标 或 当前城市中心
+    const initLng = currentLng || (currentCity ? currentCity.lng : 106.71);
+    const initLat = currentLat || (currentCity ? currentCity.lat : 26.57);
+    pickMapCenter = { lng: initLng, lat: initLat };
+    
+    // 重置状态
+    pickMapGeocodeRetries = 0;
+    geocoderReady = false;
+    document.getElementById('pick-map-addr-text').innerHTML = '正在获取地址...<div class="pick-map-addr-sub"></div>';
+
+    // 初始化或复用地图
+    if (!pickMap) {
+      if (typeof AMap !== 'undefined') {
+        pickMap = new AMap.Map('pick-amap', {
+          center: [initLng, initLat],
+          zoom: 16,
+          mapStyle: 'amap://styles/whitesmoke'
+        });
+        
+        // 等待地图完成加载后绑定事件
+        pickMap.on('complete', function() {
+          console.log('pickMap地图加载完成，初始化逆地理编码');
+          bindPickMapEvents();
+          // 延迟确保 Geocoder 插件可用
+          setTimeout(() => pickMapReverseGeocode(initLng, initLat), 600);
+        });
+      } else {
+        document.getElementById('pick-map-addr-text').innerHTML = '地图加载失败，请搜索地址';
+      }
+    } else {
+      pickMap.setCenter([initLng, initLat]);
+      pickMap.setZoom(16);
+      // 复用地图时重新请求逆地理编码
+      setTimeout(() => pickMapReverseGeocode(initLng, initLat), 500);
+    }
+  }
+
+  function bindPickMapEvents() {
+    if (!pickMap) return;
+    const pin = document.getElementById('pick-map-pin');
+
+    pickMap.on('movestart', function() {
+      pickMapDragging = true;
+      pin.classList.add('dragging');
+      document.getElementById('pick-map-addr-text').innerHTML = '移动中...<div class="pick-map-addr-sub" id="pick-map-addr-sub"></div>';
+      clearTimeout(pickMapGeocodeTimer);
+    });
+
+    pickMap.on('mapmove', function() {
+      const center = pickMap.getCenter();
+      pickMapCenter = { lng: center.lng, lat: center.lat };
+    });
+
+    pickMap.on('moveend', function() {
+      pickMapDragging = false;
+      pin.classList.remove('dragging');
+      const center = pickMap.getCenter();
+      pickMapCenter = { lng: center.lng, lat: center.lat };
+      // 防抖：停止移动后400ms再请求
+      clearTimeout(pickMapGeocodeTimer);
+      pickMapGeocodeTimer = setTimeout(() => {
+        pickMapReverseGeocode(pickMapCenter.lng, pickMapCenter.lat);
+      }, 400);
+    });
+  }
+
+  let pickMapGeocodeRetries = 0;
+  let geocoderReady = false;
+  
+  function pickMapReverseGeocode(lng, lat) {
+    if (typeof AMap === 'undefined') {
+      document.getElementById('pick-map-addr-text').innerHTML = `经度: ${lng.toFixed(5)}, 纬度: ${lat.toFixed(5)}<div class="pick-map-addr-sub" id="pick-map-addr-sub"></div>`;
+      return;
+    }
+    console.log('pickMap逆地理编码:', lng, lat);
+    
+    // 如果Geocoder已准备好，直接使用
+    if (geocoderReady && typeof AMap.Geocoder !== 'undefined') {
+      doReverseGeocode(lng, lat);
+      return;
+    }
+    
+    // 加载Geocoder插件
+    AMap.plugin('AMap.Geocoder', function() {
+      geocoderReady = true;
+      console.log('Geocoder插件已加载');
+      doReverseGeocode(lng, lat);
+    });
+  }
+  
+  function doReverseGeocode(lng, lat) {
+    try {
+      // 使用基础配置，简化调用
+      const geocoder = new AMap.Geocoder({ 
+        radius: 1000,
+        extensions: 'base'  // 简化模式
+      });
+      
+      // 注意：高德 API 需要经度在前，纬度在后
+      const location = [lng, lat];
+      console.log('调用getAddress，坐标:', location);
+      
+      geocoder.getAddress(location, function(status, result) {
+        console.log('pickMap逆地理结果 - status:', status, 'result:', JSON.stringify(result));
+        
+        if (status === 'complete' && result.info === 'OK' && result.regeocode) {
+          const address = result.regeocode.formattedAddress;
+          const ac = result.regeocode.addressComponent;
+          
+          console.log('解析成功 - address:', address, 'ac:', ac);
+          
+          // 构建显示地址
+          let mainAddr = '';
+          let subAddr = '';
+          if (ac) {
+            const province = ac.province || '';
+            const city = ac.city || '';
+            const district = ac.district || '';
+            const street = ac.street || '';
+            const streetNum = ac.streetNumber || '';
+            
+            // 优先显示区/县 + 街道
+            if (district && street) {
+              mainAddr = district + (street ? street + streetNum : '');
+              subAddr = city !== district ? city : '';
+            } else if (city) {
+              mainAddr = city;
+              subAddr = district || province;
+            } else {
+              mainAddr = province || address;
+            }
+          }
+          
+          if (!mainAddr) mainAddr = address;
+          
+          document.getElementById('pick-map-addr-text').innerHTML =
+            `${mainAddr}<div class="pick-map-addr-sub" id="pick-map-addr-sub">${subAddr}</div>`;
+          pickMapCenter._address = address;
+          pickMapGeocodeRetries = 0;
+        } else {
+          // API返回失败，打印详细信息
+          console.log('逆地理编码失败 - status:', status, 'info:', result.info, 'result:', result);
+          
+          if (pickMapGeocodeRetries < 2) {
+            pickMapGeocodeRetries++;
+            console.log('pickMap逆地理失败，800ms后重试，第' + pickMapGeocodeRetries + '次');
+            setTimeout(() => pickMapReverseGeocode(lng, lat), 800);
+          } else {
+            // 使用坐标反查城市
+            const cityName = currentCity ? currentCity.name : '当前位置附近';
+            document.getElementById('pick-map-addr-text').innerHTML = 
+              `${cityName}<div class="pick-map-addr-sub" id="pick-map-addr-sub">（点击确认使用此位置）</div>`;
+            pickMapCenter._address = cityName;
+            pickMapGeocodeRetries = 0;
+          }
+        }
+      });
+    } catch(e) {
+      console.error('Geocoder调用异常:', e);
+      const cityName = currentCity ? currentCity.name : '当前位置附近';
+      document.getElementById('pick-map-addr-text').innerHTML = 
+        `${cityName}<div class="pick-map-addr-sub" id="pick-map-addr-sub">（点击确认使用此位置）</div>`;
+      pickMapCenter._address = cityName;
+    }
+  }
+
+  function confirmPickLocation() {
+    const addrEl = document.getElementById('pick-map-addr-text');
+    // 获取文本（去掉子元素内容）
+    let addr = '';
+    addrEl.childNodes.forEach(node => {
+      if (node.nodeType === 3) addr += node.textContent.trim();
+    });
+    if (!addr || addr === '正在获取地址...' || addr === '移动中...') {
+      addr = pickMapCenter._address || `${pickMapCenter.lat.toFixed(4)},${pickMapCenter.lng.toFixed(4)}`;
+    }
+
+    if (pickMapTarget === 'start') {
+      selectedStart = addr;
+      currentLat = pickMapCenter.lat;
+      currentLng = pickMapCenter.lng;
+      const el = document.getElementById('loc-start');
+      el.textContent = addr;
+      el.classList.remove('placeholder');
+      document.getElementById('loc-btn').innerHTML = '📍 重新定位';
+    } else {
+      selectedEnd = addr;
+      const el = document.getElementById('loc-end');
+      el.textContent = addr;
+      el.classList.remove('placeholder');
+    }
+
+    showToast('📍 已选择: ' + addr.substring(0, 16) + (addr.length > 16 ? '…' : ''));
+    switchPage('home');
+    // 选择完位置后计算路线
+    if (selectedStart && selectedEnd) {
+      setTimeout(updatePriceByRoute, 300);
+    }
+  }
+
+  function closePickMap(noNav) {
+    if (!noNav) switchPage('home');
+  }
+
+  function switchStartEnd() {
+    const tmp = selectedStart;
+    selectedStart = selectedEnd;
+    selectedEnd = tmp;
+    const startEl = document.getElementById('loc-start');
+    const endEl = document.getElementById('loc-end');
+    if (selectedStart) { startEl.textContent = selectedStart; startEl.classList.remove('placeholder'); }
+    else { startEl.textContent = '您在哪里上车？'; startEl.classList.add('placeholder'); }
+    if (selectedEnd) { endEl.textContent = selectedEnd; endEl.classList.remove('placeholder'); }
+    else { endEl.textContent = '你要去哪里？'; endEl.classList.add('placeholder'); }
+    if (selectedStart && selectedEnd) updatePriceByRoute();
+  }
+
+  // ===== 管理员配置 =====
+  const ADMIN_PHONES = ['18866669999']; // 管理员手机号列表
+  
+  function isAdmin() {
+    if (!currentUser || !currentUser.rawPhone) return false;
+    return ADMIN_PHONES.includes(currentUser.rawPhone);
+  }
+  
+  function enterAdminPage() {
+    if (!isLoggedIn) {
+      showToast('请先登录');
+      showLoginModal();
+      return;
+    }
+    if (!isAdmin()) {
+      showToast('⛔ 权限不足，仅管理员可访问');
+      return;
+    }
+    switchPage('admin');
+  }
+
+  // ===== 模拟用户数据库 =====
+  const mockUserDB = {
+    '13812345678': {
+      uid: 'U10001', name: '张小明', phone: '138****5678', avatar: '😎',
+      balance: 258.50, couponCount: 3, tripCount: 86, savedAmount: 128, rating: 4.9,
+      level: '黄金会员', levelIcon: '🥇', joinDate: '2024-06-15',
+      city: '百色市', cityCode: '451000', lat: 24.778, lng: 106.626,
+      orders: [
+        { id: 'DD202603220001', type: '经济快车', status: 'completed', date: '2026-03-22 08:30', driver: '张师傅', driverPhone: '135****6789', plate: '桂B·A1234', from: '百色市右江区解放街', to: '百色高铁站', price: 52.5, distance: 18.6, duration: 35, rating: 5 },
+        { id: 'DD202603200001', type: '舒适型',   status: 'completed', date: '2026-03-20 19:15', driver: '李师傅', driverPhone: '137****2233', plate: '桂B·B5678', from: '百色学院', to: '百色市人民医院', price: 38.0, distance: 12.3, duration: 28, rating: 4 },
+        { id: 'DD202603180002', type: '顺风车',   status: 'completed', date: '2026-03-18 07:45', driver: '王师傅', driverPhone: '139****4455', plate: '桂B·C9012', from: '隆林县政府', to: '百色市客运站', price: 62.0, distance: 86.0, duration: 110, rating: 5 },
+        { id: 'DD202603150001', type: '经济快车', status: 'cancelled', date: '2026-03-15 14:20', driver: '-', driverPhone: '', plate: '-', from: '百色万达广场', to: '右江民族医学院', price: 0, distance: 0, duration: 0, rating: 0 },
+        { id: 'DD202603100001', type: '经济快车', status: 'completed', date: '2026-03-10 09:00', driver: '陈师傅', driverPhone: '186****7788', plate: '桂B·D3456', from: '百色起义纪念馆', to: '百色站', price: 24.5, distance: 8.2, duration: 20, rating: 5 }
+      ]
+    },
+    '13698765432': {
+      uid: 'U10002', name: '李晓红', phone: '136****5432', avatar: '🌸',
+      balance: 88.00, couponCount: 1, tripCount: 23, savedAmount: 42, rating: 4.8,
+      level: '白银会员', levelIcon: '🥈', joinDate: '2025-01-20',
+      city: '南宁市', cityCode: '450100', lat: 22.817, lng: 108.366,
+      orders: [
+        { id: 'DD202603240001', type: '经济快车', status: 'completed', date: '2026-03-24 10:00', driver: '吴师傅', driverPhone: '158****9900', plate: '桂B·E7890', from: '百色市第一小学', to: '百色万达广场', price: 18.0, distance: 6.5, duration: 18, rating: 5 },
+        { id: 'DD202603220002', type: '舒适型',   status: 'completed', date: '2026-03-22 16:30', driver: '赵师傅', driverPhone: '177****1122', plate: '桂B·F2345', from: '百色学院', to: '百色站', price: 31.5, distance: 10.8, duration: 25, rating: 4 }
+      ]
+    },
+    '18866669999': {
+      uid: 'U10003', name: '王大力', phone: '188****9999', avatar: '💪',
+      balance: 520.00, couponCount: 5, tripCount: 156, savedAmount: 386, rating: 5.0,
+      level: '钻石会员', levelIcon: '💎', joinDate: '2023-11-08', isAdmin: true,
+      city: '百色市', cityCode: '451000', lat: 24.774, lng: 105.343,
+      orders: [
+        { id: 'DD202603250001', type: '顺风车',   status: 'ongoing',   date: '2026-03-25 09:50', driver: '黄师傅', driverPhone: '135****0011', plate: '桂B·G6789', from: '隆林县新州镇', to: '百色高铁站', price: 58.0, distance: 88.0, duration: 115, rating: 0 },
+        { id: 'DD202603230001', type: '经济快车', status: 'completed', date: '2026-03-23 18:00', driver: '孙师傅', driverPhone: '139****2233', plate: '桂B·H0123', from: '百色市人民医院', to: '百色学院', price: 22.0, distance: 7.8, duration: 22, rating: 5 }
+      ]
+    }
+  };
+
+  // 微信账号数据
+  const mockWechatUsers = [
+    { uid: 'W20001', openid: 'wx_abc123', name: '微信用户小李', phone: '+86 138****8888', avatar: '💚', balance: 150.00, couponCount: 2, tripCount: 12, savedAmount: 28, rating: 4.7, level: '普通会员', levelIcon: '🏅', joinDate: '2025-08-10', city: '百色市', cityCode: '451000', lat: 24.778, lng: 106.626, orders: [] },
+    { uid: 'W20002', openid: 'wx_def456', name: '微信用户小张', phone: '+86 158****6666', avatar: '💙', balance: 380.00, couponCount: 4, tripCount: 67, savedAmount: 155, rating: 4.9, level: '黄金会员', levelIcon: '🥇', joinDate: '2024-03-22', city: '南宁市', cityCode: '450100', lat: 22.817, lng: 108.366, orders: [] }
+  ];
+
+  // 全量用户列表（管理后台用）
+  const allUsersForAdmin = [
+    { uid: 'U10001', name: '张小明',   phone: '138****5678', avatar: '😎', level: '黄金会员', tripCount: 86,  balance: 258.50, joinDate: '2024-06-15', status: 'active' },
+    { uid: 'U10002', name: '李晓红',   phone: '136****5432', avatar: '🌸', level: '白银会员', tripCount: 23,  balance: 88.00,  joinDate: '2025-01-20', status: 'active' },
+    { uid: 'U10003', name: '王大力',   phone: '188****9999', avatar: '💪', level: '钻石会员', tripCount: 156, balance: 520.00, joinDate: '2023-11-08', status: 'active' },
+    { uid: 'U10004', name: '陈美玲',   phone: '155****3344', avatar: '🌺', level: '白银会员', tripCount: 41,  balance: 120.00, joinDate: '2024-11-30', status: 'active' },
+    { uid: 'U10005', name: '刘建国',   phone: '139****7788', avatar: '🧑', level: '普通会员', tripCount: 8,   balance: 30.00,  joinDate: '2025-12-01', status: 'active' },
+    { uid: 'U10006', name: '赵雨晴',   phone: '177****9900', avatar: '☀️', level: '黄金会员', tripCount: 99,  balance: 410.00, joinDate: '2024-02-14', status: 'active' },
+    { uid: 'U10007', name: '孙小虎',   phone: '186****1122', avatar: '🐯', level: '钻石会员', tripCount: 200, balance: 980.00, joinDate: '2023-05-20', status: 'active' },
+    { uid: 'U10008', name: '周静怡',   phone: '158****5566', avatar: '🎀', level: '普通会员', tripCount: 5,   balance: 15.00,  joinDate: '2026-01-08', status: 'inactive' },
+    { uid: 'W20001', name: '微信用户小李', phone: '+86 138****8888', avatar: '💚', level: '普通会员', tripCount: 12,  balance: 150.00, joinDate: '2025-08-10', status: 'active' },
+    { uid: 'W20002', name: '微信用户小张', phone: '+86 158****6666', avatar: '💙', level: '黄金会员', tripCount: 67,  balance: 380.00, joinDate: '2024-03-22', status: 'active' }
+  ];
+
+  // 司机数据（管理后台用）
+  const driversForAdmin = [
+    { did: 'D30001', name: '张师傅', phone: '135****6789', avatar: '🧔', plate: '桂B·A1234', carType: '大众朗逸', tripCount: 1205, rating: 4.95, income: 32680, status: 'online',  joinDate: '2022-03-10' },
+    { did: 'D30002', name: '李师傅', phone: '137****2233', avatar: '👴', plate: '桂B·B5678', carType: '丰田凯美瑞', tripCount: 876,  rating: 4.88, income: 28450, status: 'online',  joinDate: '2022-08-22' },
+    { did: 'D30003', name: '王师傅', phone: '139****4455', avatar: '🧑', plate: '桂B·C9012', carType: '本田雅阁',  tripCount: 543,  rating: 4.92, income: 18900, status: 'offline', joinDate: '2023-04-15' },
+    { did: 'D30004', name: '陈师傅', phone: '186****7788', avatar: '👨', plate: '桂B·D3456', carType: '别克君越',  tripCount: 2312, rating: 4.97, income: 67200, status: 'online',  joinDate: '2021-11-01' },
+    { did: 'D30005', name: '吴师傅', phone: '158****9900', avatar: '🧓', plate: '桂B·E7890', carType: '大众帕萨特', tripCount: 389,  rating: 4.80, income: 13560, status: 'online',  joinDate: '2023-09-30' },
+    { did: 'D30006', name: '黄师傅', phone: '135****0011', avatar: '🧑', plate: '桂B·G6789', carType: '丰田卡罗拉', tripCount: 721,  rating: 4.85, income: 22400, status: 'busy',   joinDate: '2022-12-18' }
+  ];
+
+  // ===== localStorage 持久化 =====
+  const STORAGE_KEY = 'douYue_userData';
+
+  function saveToStorage() {
+    if (!currentUser) {
+      console.log('localStorage: 无当前用户，跳过保存');
+      return;
+    }
+    try {
+      const data = {
+        isLoggedIn,
+        currentUser,
+        savedAt: Date.now()
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      console.log('localStorage: 登录状态已保存', currentUser.name);
+    } catch(e) {
+      console.error('localStorage: 保存失败', e);
+    }
+  }
+
+  function loadFromStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        console.log('localStorage: 无登录缓存');
+        return false;
+      }
+      const data = JSON.parse(raw);
+      console.log('localStorage: 读取到缓存', data);
+      // 7天内的缓存有效
+      if (Date.now() - data.savedAt > 7 * 24 * 3600 * 1000) {
+        console.log('localStorage: 缓存已过期');
+        localStorage.removeItem(STORAGE_KEY);
+        return false;
+      }
+      if (data.isLoggedIn && data.currentUser) {
+        console.log('localStorage: 恢复登录状态', data.currentUser.name);
+        doLogin(data.currentUser, true); // true = 静默登录（不弹toast）
+        // 恢复登录后也定位到用户城市
+        if (data.currentUser.city) {
+          setTimeout(() => {
+            autoLocateToUserCity(data.currentUser);
+          }, 800);
+        }
+        return true;
+      }
+    } catch(e) {
+      console.error('localStorage: 读取失败', e);
+    }
+    return false;
+  }
+
+  function clearStorage() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+  }
+
+  // ===== 微信登录 =====
+  let isLoggedIn = false;
+  let currentUser = null;
+  let smsCountdown = 0;
+
+  function showLoginModal() {
+    document.getElementById('login-modal').classList.add('show');
+    // 重置手机登录表单
+    document.getElementById('phone-login-wrap').classList.remove('active');
+    document.getElementById('phone-login-toggle').style.display = 'flex';
+  }
+
+  function closeLoginModal() {
+    document.getElementById('login-modal').classList.remove('show');
+  }
+
+  function handleLoginOverlayClick(e) {
+    if (e.target === document.getElementById('login-modal')) closeLoginModal();
+  }
+
+  function togglePhoneLogin() {
+    const wrap = document.getElementById('phone-login-wrap');
+    const btn = document.getElementById('phone-login-toggle');
+    wrap.classList.toggle('active');
+    if (wrap.classList.contains('active')) {
+      btn.style.display = 'none';
+    }
+  }
+
+  function checkPhoneInput() {
+    const val = document.getElementById('phone-input').value;
+    const smsBtn = document.getElementById('sms-btn');
+    smsBtn.disabled = !/^1[3-9]\d{9}$/.test(val);
+  }
+
+  function sendSmsCode() {
+    if (smsCountdown > 0) return;
+    const phone = document.getElementById('phone-input').value;
+    if (!/^1[3-9]\d{9}$/.test(phone)) { showToast('请输入正确的手机号'); return; }
+
+    document.getElementById('sms-code-group').style.display = 'flex';
+    showToast('验证码已发送（模拟：888888）');
+
+    // 倒计时60s
+    smsCountdown = 60;
+    const btn = document.getElementById('sms-btn');
+    btn.disabled = true;
+    const timer = setInterval(() => {
+      smsCountdown--;
+      btn.textContent = smsCountdown > 0 ? `${smsCountdown}s` : '重新发送';
+      if (smsCountdown <= 0) {
+        clearInterval(timer);
+        btn.disabled = false;
+      }
+    }, 1000);
+  }
+
+  function submitPhoneLogin() {
+    const phone = document.getElementById('phone-input').value;
+    const code = document.getElementById('sms-input') ? document.getElementById('sms-input').value : '';
+    if (!/^1[3-9]\d{9}$/.test(phone)) { showToast('请输入正确的手机号'); return; }
+    if (code !== '888888') { showToast('验证码错误，请输入888888'); return; }
+
+    const maskedPhone = phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+    
+    // 从数据库查找用户，如果没有则创建新用户
+    let userData;
+    if (mockUserDB[phone]) {
+      // 数据库中有该用户，使用完整数据
+      const dbUser = mockUserDB[phone];
+      userData = {
+        name: dbUser.name,
+        phone: dbUser.phone,
+        avatar: dbUser.avatar,
+        loginType: 'phone',
+        rawPhone: phone,
+        uid: dbUser.uid,
+        balance: dbUser.balance,
+        couponCount: dbUser.couponCount,
+        tripCount: dbUser.tripCount,
+        savedAmount: dbUser.savedAmount,
+        rating: dbUser.rating,
+        level: dbUser.level,
+        levelIcon: dbUser.levelIcon,
+        joinDate: dbUser.joinDate,
+        orders: dbUser.orders
+      };
+    } else {
+      // 新用户，使用默认数据
+      userData = {
+        name: '用户' + phone.slice(-4),
+        phone: maskedPhone,
+        avatar: '📱',
+        loginType: 'phone',
+        rawPhone: phone,
+        uid: 'U' + Date.now(),
+        balance: 0,
+        couponCount: 0,
+        tripCount: 0,
+        savedAmount: 0,
+        rating: 5.0,
+        level: '普通会员',
+        levelIcon: '🏅',
+        joinDate: new Date().toISOString().split('T')[0],
+        orders: []
+      };
+    }
+    
+    doLogin(userData);
+  }
+
+  // 微信登录计数器，用于轮流分配账号（模拟模式用）
+  let wechatLoginCount = 0;
+  
+  // 是否使用模拟微信登录（开发测试时设为true，生产环境设为false）
+  const WECHAT_LOGIN_MOCK = true;
+  
+  function loginWithWechat() {
+    if (WECHAT_LOGIN_MOCK) {
+      // 模拟模式：使用测试账号
+      mockWechatLogin();
+    } else {
+      // 真实模式：调用微信SDK授权
+      realWechatLogin();
+    }
+  }
+  
+  // 模拟微信登录（开发测试用）
+  function mockWechatLogin() {
+    showToast('微信授权中...');
+    setTimeout(() => {
+      // 轮流使用不同的微信账号，模拟不同用户登录
+      const userIndex = wechatLoginCount % mockWechatUsers.length;
+      wechatLoginCount++;
+      const wUser = mockWechatUsers[userIndex];
+      doLogin({
+        name: wUser.name, phone: wUser.phone, avatar: wUser.avatar, loginType: 'wechat',
+        uid: wUser.uid, balance: wUser.balance, couponCount: wUser.couponCount,
+        tripCount: wUser.tripCount, savedAmount: wUser.savedAmount,
+        rating: wUser.rating, level: wUser.level, levelIcon: wUser.levelIcon, 
+        city: wUser.city, cityCode: wUser.cityCode, lat: wUser.lat, lng: wUser.lng,
+        orders: wUser.orders
+      });
+    }, 1000);
+  }
+  
+  // 真实微信登录（需要接入微信SDK）
+  function realWechatLogin() {
+    // 检查是否在微信环境中
+    const isWechat = /MicroMessenger/i.test(navigator.userAgent);
+    
+    if (!isWechat) {
+      showToast('请在微信中打开此页面');
+      return;
+    }
+    
+    showToast('正在唤起微信授权...');
+    
+    // 调用微信JS-SDK授权登录
+    // 需要先引入微信JS-SDK: https://res.wx.qq.com/open/js/jweixin-1.6.0.js
+    if (typeof wx !== 'undefined' && wx.login) {
+      wx.login({
+        success: function(res) {
+          if (res.code) {
+            // 将code发送到后端换取openid和用户信息
+            exchangeCodeForUserInfo(res.code);
+          } else {
+            showToast('微信授权失败：' + res.errMsg);
+          }
+        },
+        fail: function(err) {
+          showToast('微信授权失败，请重试');
+          console.error('微信登录失败:', err);
+        }
+      });
+    } else {
+      showToast('微信SDK未加载，请检查配置');
+      console.error('微信SDK未加载，请引入 https://res.wx.qq.com/open/js/jweixin-1.6.0.js');
+    }
+  }
+  
+  // 用code换取用户信息（需要后端支持）
+  function exchangeCodeForUserInfo(code) {
+    // 这里需要调用你的后端接口
+    // 后端用code向微信服务器换取openid和access_token
+    // 然后可以获取用户基本信息
+    
+    // 示例：调用后端API
+    /*
+    fetch('/api/wechat/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        doLogin({
+          name: data.userInfo.nickname,
+          phone: data.userInfo.phone || '',
+          avatar: data.userInfo.headimgurl,
+          loginType: 'wechat',
+          uid: 'W' + data.userInfo.openid,
+          openid: data.userInfo.openid,
+          ...data.userData // 后端返回的用户数据
+        });
+      } else {
+        showToast('登录失败：' + data.message);
+      }
+    })
+    .catch(err => {
+      showToast('网络错误，请重试');
+      console.error(err);
+    });
+    */
+    
+    // 临时提示：需要接入后端
+    showToast('⚠️ 需要接入微信登录后端API');
+    console.log('微信授权code:', code);
+    console.log('请接入后端接口：/api/wechat/login');
+  }
+
+  function doLogin(user, silent) {
+    isLoggedIn = true;
+    currentUser = user;
+
+    // 尝试从用户数据库补充完整信息
+    const dbPhone = user.rawPhone || '';
+    if (dbPhone && mockUserDB[dbPhone]) {
+      const dbUser = mockUserDB[dbPhone];
+      currentUser = Object.assign({}, user, {
+        uid: dbUser.uid, balance: dbUser.balance, couponCount: dbUser.couponCount,
+        tripCount: dbUser.tripCount, savedAmount: dbUser.savedAmount,
+        rating: dbUser.rating, level: dbUser.level, levelIcon: dbUser.levelIcon,
+        orders: dbUser.orders
+      });
+    }
+
+    // 更新"我的"页面
+    document.getElementById('mine-not-login').style.display = 'none';
+    document.getElementById('mine-logged-in').style.display = 'block';
+    document.getElementById('mine-avatar').textContent = currentUser.avatar;
+    document.getElementById('mine-name').textContent = currentUser.name;
+    document.getElementById('mine-phone').textContent = currentUser.phone;
+    document.getElementById('logout-btn').style.display = 'flex';
+    
+    // 管理员显示后台入口
+    const adminMenu = document.getElementById('admin-menu-item');
+    if (adminMenu) {
+      adminMenu.style.display = isAdmin() ? 'flex' : 'none';
+    }
+
+    // 更新统计数据
+    updateMineStats();
+
+    // 更新订单列表
+    renderUserOrders();
+
+    // 保存到本地
+    saveToStorage();
+
+    // 根据用户所在城市自动定位
+    if (currentUser.city) {
+      setTimeout(() => {
+        autoLocateToUserCity(currentUser);
+      }, 500);
+    }
+
+    closeLoginModal();
+    if (!silent) showToast('🎉 登录成功，欢迎 ' + currentUser.name);
+  }
+
+  // 根据用户城市自动定位
+  function autoLocateToUserCity(user) {
+    if (!user.city || !cityData[user.city]) {
+      console.log('用户城市信息无效:', user.city);
+      return;
+    }
+    
+    const cityInfo = cityData[user.city];
+    currentCity = { ...cityInfo, name: user.city };
+    
+    // 更新城市显示
+    document.getElementById('city-name').textContent = user.city;
+    
+    // 如果有精确坐标，使用用户坐标；否则使用城市中心坐标
+    const lat = user.lat || cityInfo.lat;
+    const lng = user.lng || cityInfo.lng;
+    
+    // 更新当前位置
+    currentLat = lat;
+    currentLng = lng;
+    
+    // 更新地址列表
+    updateAddressListForCity(user.city);
+    
+    // 更新上车地点显示
+    const locStart = document.getElementById('loc-start');
+    if (locStart) {
+      currentAddress = user.city + '（用户常用位置）';
+      locStart.textContent = currentAddress;
+      locStart.classList.remove('placeholder');
+    }
+    
+    // 更新地图中心
+    if (map) {
+      map.setCenter([lng, lat]);
+      map.setZoom(14);
+      addCurrentMarker(lng, lat);
+    }
+    
+    console.log('✅ 已定位到用户所在城市:', user.city, '坐标:', lat, lng);
+    showToast('📍 已定位到' + user.city);
+  }
+
+  function logoutUser() {
+    // 显示自定义确认提示
+    const toastId = 'logout-confirm-' + Date.now();
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.style.cssText = `position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
+      background:white;border-radius:16px;padding:20px 24px;box-shadow:0 8px 32px rgba(0,0,0,0.18);
+      z-index:9999;text-align:center;width:270px;`;
+    toast.innerHTML = `
+      <div style="font-size:16px;font-weight:600;margin-bottom:8px;">退出登录</div>
+      <div style="font-size:13px;color:#888;margin-bottom:18px;">确定要退出当前账号吗？</div>
+      <div style="display:flex;gap:12px;">
+        <button onclick="document.getElementById('${toastId}').remove()" style="flex:1;padding:11px;border:1.5px solid #eee;border-radius:12px;background:white;font-size:14px;cursor:pointer;">取消</button>
+        <button onclick="doLogout();document.getElementById('${toastId}').remove()" style="flex:1;padding:11px;border:none;border-radius:12px;background:#f44336;color:white;font-size:14px;font-weight:600;cursor:pointer;">退出</button>
+      </div>`;
+    document.body.appendChild(toast);
+  }
+
+  function doLogout() {
+    isLoggedIn = false;
+    currentUser = null;
+    clearStorage();
+    document.getElementById('mine-not-login').style.display = 'flex';
+    document.getElementById('mine-logged-in').style.display = 'none';
+    document.getElementById('logout-btn').style.display = 'none';
+    // 隐藏管理员入口
+    const adminMenu = document.getElementById('admin-menu-item');
+    if (adminMenu) adminMenu.style.display = 'none';
+    // 重置统计、钱包和优惠券
+    document.querySelectorAll('.mine-stat-num').forEach(el => el.textContent = '--');
+    const walletBalance = document.querySelector('.wallet-balance');
+    if (walletBalance) walletBalance.textContent = '--';
+    const couponBadge = document.querySelector('.mine-menu-badge');
+    if (couponBadge) couponBadge.style.display = 'none';
+    renderUserOrders();
+    showToast('已退出登录');
+  }
+
+  // ===== 城市选择 =====
+  function showCityModal() {
+    // 更新定位城市显示
+    const locateChip = document.getElementById('locate-city-chip');
+    const locateName = document.getElementById('locate-city-name');
+    if (currentCity && currentCity.name) {
+      locateName.textContent = currentCity.name;
+      locateChip.style.display = 'block';
+    } else {
+      locateChip.style.display = 'none';
+    }
+    document.getElementById('city-modal').classList.add('show');
+  }
+  function closeCityModal(e) {
+    if (e.target === document.getElementById('city-modal')) {
+      document.getElementById('city-modal').classList.remove('show');
+    }
+  }
+  function selectCity(city) {
+    currentCity = cityData[city] || { name: city, lat: 26.57, lng: 106.71 };
+    currentCity.name = city;
+    document.getElementById('city-name').textContent = city;
+    document.querySelectorAll('.city-chip').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('city-modal').classList.remove('show');
+    
+    // 切换城市后更新地图中心
+    if (map && currentCity.lng && currentCity.lat) {
+      map.setCenter([currentCity.lng, currentCity.lat]);
+      map.setZoom(12);
+    }
+    
+    // 更新地址列表为当前城市
+    updateAddressListForCity(city);
+    
+    showToast('已切换到' + city);
+  }
+  
+  // 根据城市更新地址列表
+  function updateAddressListForCity(city) {
+    // 根据城市筛选或生成该城市的地址列表
+    const cityAddresses = generateCityAddresses(city);
+    renderAddressList(cityAddresses);
+  }
+  
+  // 生成城市地址列表
+  function generateCityAddresses(city) {
+    const cityPrefix = city.replace('市', '');
+    const addresses = [];
+    
+    // 通用地点模板
+    const commonPlaces = [
+      { name: '火车站', sub: '{city}火车站', icon: '🚂' },
+      { name: '高铁站', sub: '{city}北站/东站', icon: '🚄' },
+      { name: '机场', sub: '{city}机场', icon: '✈️' },
+      { name: '市中心医院', sub: '{city}市中心医院', icon: '🏥' },
+      { name: '人民广场', sub: '{city}人民广场', icon: '🏢' },
+      { name: '步行街', sub: '{city}商业步行街', icon: '🛍' },
+      { name: '万达广场', sub: '{city}万达广场', icon: '🛒' },
+      { name: '大学城', sub: '{city}大学城', icon: '🎓' },
+      { name: '博物馆', sub: '{city}市博物馆', icon: '🏛️' },
+      { name: '植物园', sub: '{city}植物园', icon: '🌳' },
+      { name: '体育中心', sub: '{city}体育中心', icon: '🏟️' },
+      { name: '图书馆', sub: '{city}市图书馆', icon: '📚' }
+    ];
+    
+    commonPlaces.forEach((place, index) => {
+      addresses.push({
+        name: place.name.replace('{city}', cityPrefix),
+        sub: place.sub.replace('{city}', cityPrefix),
+        icon: place.icon,
+        dist: (Math.random() * 10 + 0.5).toFixed(1) + 'km'
+      });
+    });
+    
+    // 添加一些该城市的真实知名地点
+    const citySpecificPlaces = getCitySpecificPlaces(city);
+    addresses.unshift(...citySpecificPlaces);
+    
+    return addresses;
+  }
+  
+  // 获取城市特定地点
+  function getCitySpecificPlaces(city) {
+    const places = {
+      '北京市': [
+        { name: '天安门广场', sub: '东城区东长安街', icon: '🏛️', dist: '5.2km' },
+        { name: '故宫', sub: '东城区景山前街4号', icon: '🏯', dist: '5.8km' },
+        { name: '首都国际机场', sub: '朝阳区机场西路', icon: '✈️', dist: '25.6km' },
+        { name: '北京南站', sub: '丰台区永外大街车站路', icon: '🚄', dist: '8.3km' },
+        { name: '三里屯', sub: '朝阳区三里屯路', icon: '🛍', dist: '6.5km' }
+      ],
+      '上海市': [
+        { name: '外滩', sub: '黄浦区中山东一路', icon: '🌃', dist: '3.2km' },
+        { name: '东方明珠', sub: '浦东新区世纪大道1号', icon: '🗼', dist: '4.5km' },
+        { name: '浦东国际机场', sub: '浦东新区迎宾大道', icon: '✈️', dist: '32.1km' },
+        { name: '虹桥火车站', sub: '闵行区申贵路', icon: '🚄', dist: '15.8km' },
+        { name: '南京路步行街', sub: '黄浦区南京东路', icon: '🛍', dist: '2.8km' }
+      ],
+      '广州市': [
+        { name: '广州塔', sub: '海珠区阅江西路222号', icon: '🗼', dist: '4.2km' },
+        { name: '白云国际机场', sub: '花都区机场大道', icon: '✈️', dist: '28.5km' },
+        { name: '广州南站', sub: '番禺区石壁街道', icon: '🚄', dist: '18.6km' },
+        { name: '北京路步行街', sub: '越秀区北京路', icon: '🛍', dist: '1.5km' },
+        { name: '珠江新城', sub: '天河区珠江东路', icon: '🏢', dist: '3.8km' }
+      ],
+      '深圳市': [
+        { name: '深圳湾公园', sub: '南山区滨海大道', icon: '🌊', dist: '5.5km' },
+        { name: '宝安国际机场', sub: '宝安区机场大道', icon: '✈️', dist: '22.3km' },
+        { name: '深圳北站', sub: '龙华区民治街道', icon: '🚄', dist: '12.8km' },
+        { name: '华强北', sub: '福田区华强北路', icon: '📱', dist: '2.6km' },
+        { name: '世界之窗', sub: '南山区深南大道', icon: '🎢', dist: '8.2km' }
+      ],
+      '成都市': [
+        { name: '宽窄巷子', sub: '青羊区长顺上街', icon: '🏘️', dist: '2.1km' },
+        { name: '天府广场', sub: '青羊区人民南路', icon: '🏢', dist: '1.2km' },
+        { name: '双流国际机场', sub: '双流区机场路', icon: '✈️', dist: '16.5km' },
+        { name: '成都东站', sub: '成华区青衣江路', icon: '🚄', dist: '8.9km' },
+        { name: '春熙路', sub: '锦江区春熙路', icon: '🛍', dist: '1.8km' }
+      ],
+      '杭州市': [
+        { name: '西湖', sub: '西湖区龙井路', icon: '🌊', dist: '3.5km' },
+        { name: '萧山国际机场', sub: '萧山区机场路', icon: '✈️', dist: '26.8km' },
+        { name: '杭州东站', sub: '江干区全福桥路', icon: '🚄', dist: '7.2km' },
+        { name: '湖滨银泰', sub: '上城区延安路', icon: '🛍', dist: '2.3km' },
+        { name: '灵隐寺', sub: '西湖区灵隐路', icon: '⛩️', dist: '8.6km' }
+      ],
+      '武汉市': [
+        { name: '黄鹤楼', sub: '武昌区蛇山西坡', icon: '🏯', dist: '4.2km' },
+        { name: '天河国际机场', sub: '黄陂区机场大道', icon: '✈️', dist: '28.5km' },
+        { name: '武汉站', sub: '洪山区杨春湖路', icon: '🚄', dist: '12.3km' },
+        { name: '江汉路步行街', sub: '江汉区江汉路', icon: '🛍', dist: '1.8km' },
+        { name: '东湖', sub: '武昌区沿湖大道', icon: '🌊', dist: '6.5km' }
+      ],
+      '西安市': [
+        { name: '兵马俑', sub: '临潼区秦陵北路', icon: '🏺', dist: '35.6km' },
+        { name: '大雁塔', sub: '雁塔区雁塔南路', icon: '🗼', dist: '5.8km' },
+        { name: '咸阳国际机场', sub: '咸阳市渭城区', icon: '✈️', dist: '28.2km' },
+        { name: '西安北站', sub: '未央区元朔路', icon: '🚄', dist: '11.5km' },
+        { name: '回民街', sub: '莲湖区北院门', icon: '🍜', dist: '2.1km' }
+      ],
+      '重庆市': [
+        { name: '解放碑', sub: '渝中区民族路', icon: '🏢', dist: '0.5km' },
+        { name: '洪崖洞', sub: '渝中区嘉陵江滨江路', icon: '🏘️', dist: '1.2km' },
+        { name: '江北国际机场', sub: '渝北区机场路', icon: '✈️', dist: '21.8km' },
+        { name: '重庆北站', sub: '渝北区昆仑大道', icon: '🚄', dist: '8.5km' },
+        { name: '磁器口古镇', sub: '沙坪坝区磁器口', icon: '🏛️', dist: '12.3km' }
+      ],
+      '百色市': [
+        { name: '百色起义纪念馆', sub: '右江区城东路', icon: '🏛️', dist: '2.5km' },
+        { name: '百色站', sub: '右江区站前大道', icon: '🚂', dist: '3.2km' },
+        { name: '百色高铁站', sub: '右江区迎龙路', icon: '🚄', dist: '4.8km' },
+        { name: '百色学院', sub: '右江区中山二路', icon: '🎓', dist: '1.8km' },
+        { name: '百色市人民医院', sub: '右江区城乡路', icon: '🏥', dist: '2.1km' },
+        { name: '百色万达广场', sub: '右江区龙景西路', icon: '🛍', dist: '5.5km' },
+        { name: '隆林汽车站', sub: '隆林县新州镇民权街', icon: '🚌', dist: '85km' },
+        { name: '隆林县政府', sub: '隆林县新州镇民权街', icon: '🏢', dist: '85km' },
+        { name: '隆林县人民医院', sub: '隆林县新州镇民生街', icon: '🏥', dist: '86km' }
+      ]
+    };
+    
+    return places[city] || [];
+  }
+
+  // ===== 更新"我的"统计数据 =====
+  function updateMineStats() {
+    if (!currentUser) return;
+    const stats = document.querySelectorAll('.mine-stat-num');
+    if (stats[0]) stats[0].textContent = currentUser.tripCount || 0;
+    if (stats[1]) stats[1].textContent = '¥' + (currentUser.savedAmount || 0);
+    if (stats[2]) stats[2].textContent = currentUser.rating || '5.0';
+    // 更新余额
+    const walletBalance = document.querySelector('.wallet-balance');
+    if (walletBalance) walletBalance.textContent = '¥ ' + (currentUser.balance || 0).toFixed(2);
+    // 更新优惠券数量
+    const couponBadge = document.querySelector('.mine-menu-badge');
+    if (couponBadge) {
+      if (currentUser.couponCount > 0) {
+        couponBadge.textContent = currentUser.couponCount + '张';
+        couponBadge.style.display = 'inline-block';
+      } else {
+        couponBadge.style.display = 'none';
+      }
+    }
+    // 更新会员等级
+    const levelEl = document.getElementById('mine-level-badge');
+    if (levelEl) { levelEl.textContent = (currentUser.levelIcon || '') + ' ' + (currentUser.level || ''); }
+  }
+
+  // ===== 动态渲染用户订单 =====
+  function renderUserOrders(filterType) {
+    const container = document.getElementById('orders-content');
+    if (!container) return;
+
+    const orders = (currentUser && currentUser.orders) ? currentUser.orders : [];
+    const filter = filterType || 'all';
+
+    // 根据tab过滤
+    const filtered = filter === 'all' ? orders : orders.filter(o => {
+      if (filter === 'ongoing') return o.status === 'ongoing';
+      if (filter === 'completed') return o.status === 'completed';
+      if (filter === 'cancelled') return o.status === 'cancelled';
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<div style="text-align:center;padding:60px 20px;color:#bbb;">
+        <div style="font-size:48px;margin-bottom:12px;">📭</div>
+        <div style="font-size:15px;">暂无相关订单</div>
+      </div><div style="height:80px;"></div>`;
+      return;
+    }
+
+    let html = '';
+    filtered.forEach(o => {
+      const statusMap = { ongoing: '<span class="order-status ongoing">● 行程进行中</span>', completed: '<span class="order-status completed">已完成</span>', cancelled: '<span class="order-status cancelled">已取消</span>' };
+      const statusBtn = o.status === 'ongoing'
+        ? `<button class="order-action-btn primary" onclick="switchPage('calling')">查看详情</button>`
+        : o.status === 'completed'
+          ? `<button class="order-action-btn primary" onclick="showRateModal()">评价</button><button class="order-action-btn outline" onclick="showToast('再来一单')">再叫</button>`
+          : `<button class="order-action-btn outline" onclick="showToast('订单已取消')">已取消</button>`;
+      const priceHtml = o.price > 0 ? `<div class="order-footer-price">¥${o.price.toFixed(1)}</div>` : '';
+      html += `
+      <div class="order-card" style="margin-top:10px;">
+        <div class="order-card-header">
+          <span class="order-type-badge">${o.type}</span>
+          ${statusMap[o.status] || ''}
+        </div>
+        <div class="order-route">
+          <div class="order-route-row"><div class="order-route-dot s"></div><div class="order-route-text">${o.from}</div></div>
+          <div class="order-route-line-v" style="margin-left:3.5px;"></div>
+          <div class="order-route-row"><div class="order-route-dot e"></div><div class="order-route-text">${o.to}</div></div>
+        </div>
+        <div class="order-footer">
+          <div><div class="order-footer-info">${o.date}${o.driver && o.driver !== '-' ? ' · ' + o.driver : ''}</div></div>
+          <div style="display:flex;align-items:center;gap:10px;">${priceHtml}<div class="order-actions">${statusBtn}</div></div>
+        </div>
+      </div>`;
+    });
+    html += '<div style="height:80px;"></div>';
+    container.innerHTML = html;
+  }
+
+  // ===== 订单Tab =====
+  function switchOrderTab(el, type) {
+    document.querySelectorAll('.order-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    renderUserOrders(type);
+  }
+
+  // ===== 评价弹窗 =====
+  let currentRating = 5;
+  function showRateModal() {
+    document.getElementById('rate-modal').classList.add('show');
+  }
+  function closeRateModal(e) {
+    if (e.target === document.getElementById('rate-modal')) {
+      document.getElementById('rate-modal').classList.remove('show');
+    }
+  }
+  function setRating(n) {
+    currentRating = n;
+    const stars = document.querySelectorAll('.rate-star');
+    stars.forEach((s, i) => { s.textContent = i < n ? '⭐' : '☆'; s.style.fontSize = '32px'; });
+    showToast(['', '很差', '较差', '一般', '不错', '非常好'][n]);
+  }
+  function toggleRateTag(el) {
+    el.classList.toggle('selected');
+  }
+  function submitRate() {
+    document.getElementById('rate-modal').classList.remove('show');
+    showToast('评价提交成功，感谢反馈！');
+    setTimeout(() => switchTab('home'), 1500);
+  }
+
+  // ===== Toast =====
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  // ===== 地图相关功能 =====
+  function recenterMap() {
+    if (map && currentLng && currentLat) {
+      map.setCenter([currentLng, currentLat]);
+      showToast(`📍 当前位置：${currentAddress}`);
+    } else {
+      autoLocate();
+    }
+  }
+
+  function updateMapLocationInfo() {
+    const infoEl = document.getElementById('map-current-addr');
+    if (infoEl && currentAddress) {
+      infoEl.textContent = currentAddress;
+    }
+  }
+
+  // 规划路线（使用高德路径规划）
+  function planRoute(startLng, startLat, endLng, endLat) {
+    if (typeof AMap === 'undefined' || !map) return;
+    
+    AMap.plugin('AMap.Driving', function() {
+      const driving = new AMap.Driving({
+        map: map,
+        panel: 'panel'
+      });
+      
+      driving.search(
+        [startLng, startLat],
+        [endLng, endLat],
+        function(status, result) {
+          if (status === 'complete') {
+            console.log('路线规划成功:', result);
+          } else {
+            console.log('路线规划失败:', result);
+          }
+        }
+      );
+    });
+  }
+
+  // 添加起点/终点标记
+  function addRouteMarkers(startLng, startLat, endLng, endLat) {
+    if (!map) return;
+    
+    // 清除旧标记
+    if (startMarker) map.remove(startMarker);
+    if (endMarker) map.remove(endMarker);
+    
+    // 起点标记（绿色）
+    startMarker = new AMap.Marker({
+      position: [startLng, startLat],
+      icon: new AMap.Icon({
+        size: new AMap.Size(30, 40),
+        image: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 40"><path d="M15 0C6.7 0 0 6.7 0 15c0 11.25 15 25 15 25s15-13.75 15-25c0-8.3-6.7-15-15-15z" fill="%2300b36b"/><circle cx="15" cy="15" r="6" fill="white"/></svg>',
+        imageSize: new AMap.Size(30, 40)
+      }),
+      offset: new AMap.Pixel(-15, -40),
+      label: { content: '起点', offset: new AMap.Pixel(0, -45) }
+    });
+    
+    // 终点标记（橙色）
+    endMarker = new AMap.Marker({
+      position: [endLng, endLat],
+      icon: new AMap.Icon({
+        size: new AMap.Size(30, 40),
+        image: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 40"><path d="M15 0C6.7 0 0 6.7 0 15c0 11.25 15 25 15 25s15-13.75 15-25c0-8.3-6.7-15-15-15z" fill="%23ff6b35"/><circle cx="15" cy="15" r="6" fill="white"/></svg>',
+        imageSize: new AMap.Size(30, 40)
+      }),
+      offset: new AMap.Pixel(-15, -40),
+      label: { content: '终点', offset: new AMap.Pixel(0, -45) }
+    });
+    
+    map.add([startMarker, endMarker]);
+    
+    // 调整视野显示完整路线
+    map.setFitView([startMarker, endMarker], false, [60, 60, 60, 200]);
+  }
+
+
+  // ===== 管理后台 =====
+  let adminTabCurrent = 'overview';
+
+  function switchAdminTab(tab) {
+    adminTabCurrent = tab;
+    ['overview','users','orders','drivers'].forEach(t => {
+      const tabEl = document.getElementById('atab-' + t);
+      const panelEl = document.getElementById('admin-panel-' + t);
+      if (tabEl) {
+        tabEl.style.color = t === tab ? '#3f51b5' : '#888';
+        tabEl.style.borderBottom = t === tab ? '2px solid #3f51b5' : 'none';
+      }
+      if (panelEl) panelEl.style.display = t === tab ? 'block' : 'none';
+    });
+    if (tab === 'overview') renderAdminOverview();
+    else if (tab === 'users') renderAdminUsers();
+    else if (tab === 'orders') renderAdminOrders();
+    else if (tab === 'drivers') renderAdminDrivers();
+  }
+
+  function initAdminPage() {
+    // 更新管理员标签显示当前用户
+    const adminBadge = document.getElementById('admin-badge');
+    if (adminBadge && currentUser) {
+      adminBadge.textContent = currentUser.name || 'Admin';
+    }
+    switchAdminTab('overview');
+  }
+
+  function renderAdminOverview() {
+    // 统计数据
+    const totalUsers = allUsersForAdmin.length;
+    const onlineDrivers = driversForAdmin.filter(d => d.status === 'online').length;
+    const totalDrivers = driversForAdmin.length;
+    const el = id => document.getElementById(id);
+    if (el('stat-total-users')) el('stat-total-users').textContent = totalUsers;
+    if (el('stat-online-drivers')) el('stat-online-drivers').textContent = onlineDrivers;
+    if (el('stat-total-drivers')) el('stat-total-drivers').textContent = totalDrivers;
+
+    // 7日柱状图（模拟数据）
+    const weekData = [28, 35, 42, 38, 51, 44, 47];
+    const weekDays = ['周三', '周四', '周五', '周六', '周日', '周一', '今日'];
+    const maxVal = Math.max(...weekData);
+    const chartEl = el('admin-chart');
+    const labelsEl = el('admin-chart-labels');
+    if (chartEl) {
+      chartEl.innerHTML = weekData.map((v, i) => {
+        const h = Math.round((v / maxVal) * 72);
+        const isToday = i === weekData.length - 1;
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div style="font-size:10px;color:${isToday?'#3f51b5':'#888'};font-weight:${isToday?700:400};">${v}</div>
+          <div style="width:100%;height:${h}px;background:${isToday?'linear-gradient(180deg,#3f51b5,#5c6bc0)':'linear-gradient(180deg,#c5cae9,#9fa8da)'};border-radius:4px 4px 0 0;"></div>
+        </div>`;
+      }).join('');
+    }
+    if (labelsEl) {
+      labelsEl.innerHTML = weekDays.map((d, i) => {
+        const isToday = i === weekDays.length - 1;
+        return `<div style="flex:1;text-align:center;font-size:10px;color:${isToday?'#3f51b5':'#aaa'};font-weight:${isToday?700:400};">${d}</div>`;
+      }).join('');
+    }
+  }
+
+  function renderAdminUsers() {
+    const container = document.getElementById('admin-users-list');
+    const countEl = document.getElementById('admin-user-count');
+    if (!container) return;
+    if (countEl) countEl.textContent = `(共${allUsersForAdmin.length}人)`;
+    container.innerHTML = allUsersForAdmin.map(u => `
+      <div style="background:white;border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+        <div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#e8eaf6,#c5cae9);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${u.avatar}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;color:#222;">${u.name} <span style="font-size:11px;color:#5c6bc0;background:#e8eaf6;padding:1px 6px;border-radius:6px;">${u.level}</span></div>
+          <div style="font-size:12px;color:#888;margin-top:2px;">${u.phone} · 注册${u.joinDate}</div>
+          <div style="font-size:12px;color:#555;margin-top:3px;">累计 <b>${u.tripCount}</b> 单 · 余额 <b style="color:#00b36b;">¥${u.balance.toFixed(0)}</b></div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:11px;padding:3px 8px;border-radius:8px;font-weight:600;${u.status==='active'?'background:#e6f9f2;color:#00b36b;':'background:#fce4ec;color:#e53935;'}">${u.status==='active'?'正常':'禁用'}</div>
+          <div style="font-size:11px;color:#aaa;margin-top:4px;">${u.uid}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  function renderAdminOrders() {
+    const container = document.getElementById('admin-orders-list');
+    if (!container) return;
+    // 收集所有用户的订单
+    let allOrders = [];
+    Object.values(mockUserDB).forEach(u => {
+      u.orders.forEach(o => allOrders.push({ ...o, userName: u.name, userPhone: u.phone }));
+    });
+    // 按日期倒序
+    allOrders.sort((a, b) => b.date.localeCompare(a.date));
+
+    const statusStyle = {
+      ongoing: 'background:#fff3e0;color:#f57c00;',
+      completed: 'background:#e6f9f2;color:#00b36b;',
+      cancelled: 'background:#fce4ec;color:#e53935;'
+    };
+    const statusLabel = { ongoing: '进行中', completed: '已完成', cancelled: '已取消' };
+
+    container.innerHTML = allOrders.map(o => `
+      <div style="background:white;border-radius:12px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:12px;color:#888;">${o.id}</div>
+          <div style="font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600;${statusStyle[o.status]}">${statusLabel[o.status]}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <div style="width:8px;height:8px;background:#00b36b;border-radius:50%;flex-shrink:0;"></div>
+          <div style="font-size:13px;color:#333;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${o.from}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+          <div style="width:8px;height:8px;background:#ff6b35;border-radius:50%;flex-shrink:0;"></div>
+          <div style="font-size:13px;color:#333;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${o.to}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#888;padding-top:8px;border-top:1px solid #f0f0f0;">
+          <div>👤 ${o.userName} · 🚗 ${o.driver !== '-' ? o.driver : '未分配'}</div>
+          <div style="font-weight:600;color:${o.price>0?'#333':'#bbb'};">${o.price > 0 ? '¥' + o.price.toFixed(1) : '-'}</div>
+        </div>
+        <div style="font-size:11px;color:#bbb;margin-top:4px;">${o.date} · ${o.type}</div>
+      </div>`).join('');
+  }
+
+  function renderAdminDrivers() {
+    const container = document.getElementById('admin-drivers-list');
+    if (!container) return;
+    const statusStyle = { online: 'background:#e6f9f2;color:#00b36b;', offline: 'background:#f5f5f5;color:#888;', busy: 'background:#fff3e0;color:#f57c00;' };
+    const statusLabel = { online: '在线', offline: '离线', busy: '忙碌' };
+    container.innerHTML = driversForAdmin.map(d => `
+      <div style="background:white;border-radius:12px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:22px;color:white;flex-shrink:0;">${d.avatar}</div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="font-size:15px;font-weight:600;color:#222;">${d.name}</div>
+              <div style="font-size:11px;padding:2px 7px;border-radius:6px;font-weight:600;${statusStyle[d.status]}">${statusLabel[d.status]}</div>
+            </div>
+            <div style="font-size:12px;color:#888;margin-top:2px;">${d.phone} · ${d.plate}</div>
+            <div style="font-size:12px;color:#555;margin-top:2px;">${d.carType} · ⭐${d.rating} · ${d.tripCount}单</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:14px;font-weight:700;color:#00b36b;">¥${d.income.toLocaleString()}</div>
+            <div style="font-size:11px;color:#aaa;margin-top:2px;">累计收入</div>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+
+  window.addEventListener('load', function() {
+    console.log('页面加载完成，准备初始化地图...');
+
+    // 恢复本地登录状态（延迟一点确保DOM就绪）
+    setTimeout(function() {
+      const restored = loadFromStorage();
+      console.log('登录状态恢复:', restored ? '成功' : '失败/无缓存');
+      // 如果恢复失败，初始化未登录状态的订单列表
+      if (!restored) {
+        renderUserOrders();
+      }
+    }, 100);
+    
+    // 检查高德API是否加载
+    if (typeof AMap === 'undefined') {
+      console.error('高德地图API未加载，检查网络或Key配置');
+      showToast('地图加载失败，请检查网络连接');
+      // 直接使用浏览器定位
+      setTimeout(function() {
+        useBrowserGeolocation();
+      }, 500);
+      return;
+    }
+    
+    // 初始化高德地图
+    initAMap();
+    
+    // 延迟1.5秒后自动定位
+    setTimeout(function() {
+      autoLocate();
+    }, 1500);
+  });
+</script>
+<!-- ===== 管理员后台页面 ===== -->
+<div id="page-admin" class="page" style="background:#f0f2f8;">
+  <div class="status-bar" style="background:#3f51b5;">
+    <span class="time">22:00</span>
+    <span>管理后台</span>
+    <div class="icons"></div>
+  </div>
+  <!-- 顶部导航 -->
+  <div style="background:#3f51b5;padding:12px 16px 16px;color:white;display:flex;align-items:center;gap:12px;">
+    <div onclick="switchTab('mine')" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;">←</div>
+    <div style="flex:1;">
+      <div style="font-size:17px;font-weight:700;">🛠️ 运营管理后台</div>
+      <div style="font-size:12px;opacity:0.8;margin-top:2px;">抖约出行 · 数据看板</div>
+    </div>
+    <div id="admin-badge" style="font-size:12px;background:rgba(255,255,255,0.2);padding:4px 10px;border-radius:10px;">Admin</div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding-bottom:20px;">
+    <!-- Tab切换 -->
+    <div style="display:flex;background:white;border-bottom:1px solid #eee;position:sticky;top:0;z-index:10;">
+      <div class="admin-tab active" id="atab-overview" onclick="switchAdminTab('overview')" style="flex:1;padding:12px 0;text-align:center;font-size:13px;cursor:pointer;color:#3f51b5;border-bottom:2px solid #3f51b5;">概览</div>
+      <div class="admin-tab" id="atab-users"    onclick="switchAdminTab('users')"    style="flex:1;padding:12px 0;text-align:center;font-size:13px;cursor:pointer;color:#888;">用户</div>
+      <div class="admin-tab" id="atab-orders"   onclick="switchAdminTab('orders')"   style="flex:1;padding:12px 0;text-align:center;font-size:13px;cursor:pointer;color:#888;">订单</div>
+      <div class="admin-tab" id="atab-drivers"  onclick="switchAdminTab('drivers')"  style="flex:1;padding:12px 0;text-align:center;font-size:13px;cursor:pointer;color:#888;">司机</div>
+    </div>
+
+    <!-- 概览面板 -->
+    <div id="admin-panel-overview">
+      <!-- 核心指标 -->
+      <div style="padding:14px 12px 0;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="background:linear-gradient(135deg,#3f51b5,#5c6bc0);border-radius:14px;padding:16px;color:white;">
+          <div style="font-size:11px;opacity:0.8;margin-bottom:6px;">📦 今日订单</div>
+          <div style="font-size:28px;font-weight:700;" id="stat-today-orders">47</div>
+          <div style="font-size:11px;opacity:0.7;margin-top:4px;">↑ 12% vs 昨日</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#00b36b,#00d084);border-radius:14px;padding:16px;color:white;">
+          <div style="font-size:11px;opacity:0.8;margin-bottom:6px;">💰 今日流水</div>
+          <div style="font-size:28px;font-weight:700;" id="stat-today-income">¥1,836</div>
+          <div style="font-size:11px;opacity:0.7;margin-top:4px;">↑ 8% vs 昨日</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#ff6b35,#ff9a5c);border-radius:14px;padding:16px;color:white;">
+          <div style="font-size:11px;opacity:0.8;margin-bottom:6px;">👥 注册用户</div>
+          <div style="font-size:28px;font-weight:700;" id="stat-total-users">0</div>
+          <div style="font-size:11px;opacity:0.7;margin-top:4px;">↑ 2 今日新增</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#9c27b0,#ba68c8);border-radius:14px;padding:16px;color:white;">
+          <div style="font-size:11px;opacity:0.8;margin-bottom:6px;">🚗 在线司机</div>
+          <div style="font-size:28px;font-weight:700;" id="stat-online-drivers">0</div>
+          <div style="font-size:11px;opacity:0.7;margin-top:4px;">共 <span id="stat-total-drivers">0</span> 位司机</div>
+        </div>
+      </div>
+
+      <!-- 7日趋势 -->
+      <div style="background:white;margin:12px;border-radius:14px;padding:16px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:14px;color:#333;">📈 近7日订单趋势</div>
+        <div style="display:flex;align-items:flex-end;gap:6px;height:80px;" id="admin-chart">
+          <!-- JS动态生成 -->
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;" id="admin-chart-labels"></div>
+      </div>
+
+      <!-- 出行类型分布 -->
+      <div style="background:white;margin:0 12px 12px;border-radius:14px;padding:16px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:#333;">🥧 出行类型分布</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="font-size:12px;color:#666;width:56px;">经济快车</div>
+            <div style="flex:1;background:#f0f0f0;border-radius:4px;overflow:hidden;height:10px;"><div style="width:62%;height:100%;background:linear-gradient(90deg,#3f51b5,#5c6bc0);border-radius:4px;"></div></div>
+            <div style="font-size:12px;color:#333;font-weight:600;width:30px;text-align:right;">62%</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="font-size:12px;color:#666;width:56px;">舒适型</div>
+            <div style="flex:1;background:#f0f0f0;border-radius:4px;overflow:hidden;height:10px;"><div style="width:22%;height:100%;background:linear-gradient(90deg,#00b36b,#00d084);border-radius:4px;"></div></div>
+            <div style="font-size:12px;color:#333;font-weight:600;width:30px;text-align:right;">22%</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="font-size:12px;color:#666;width:56px;">顺风车</div>
+            <div style="flex:1;background:#f0f0f0;border-radius:4px;overflow:hidden;height:10px;"><div style="width:16%;height:100%;background:linear-gradient(90deg,#ff6b35,#ff9a5c);border-radius:4px;"></div></div>
+            <div style="font-size:12px;color:#333;font-weight:600;width:30px;text-align:right;">16%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 用户面板 -->
+    <div id="admin-panel-users" style="display:none;">
+      <div style="padding:12px 12px 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:14px;font-weight:600;color:#333;">用户列表 <span style="font-size:12px;color:#888;" id="admin-user-count"></span></div>
+        <div style="font-size:12px;color:#3f51b5;cursor:pointer;" onclick="showToast('导出功能开发中')">导出 ↓</div>
+      </div>
+      <div id="admin-users-list" style="padding:0 12px 12px;margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <!-- 订单面板 -->
+    <div id="admin-panel-orders" style="display:none;">
+      <div style="padding:12px 12px 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:14px;font-weight:600;color:#333;">全部订单</div>
+        <div style="font-size:12px;color:#3f51b5;cursor:pointer;" onclick="showToast('筛选功能开发中')">筛选 ⚙️</div>
+      </div>
+      <div id="admin-orders-list" style="padding:0 12px 12px;margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <!-- 司机面板 -->
+    <div id="admin-panel-drivers" style="display:none;">
+      <div style="padding:12px 12px 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:14px;font-weight:600;color:#333;">司机列表</div>
+        <div style="font-size:12px;color:#3f51b5;cursor:pointer;" onclick="showToast('新增司机功能开发中')">+ 新增</div>
+      </div>
+      <div id="admin-drivers-list" style="padding:0 12px 12px;margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
+</div>
+
+
